@@ -1,6 +1,6 @@
 const margin = {top: 40, right: 220, bottom: 40, left: 220};
 const width = 1100 - margin.left - margin.right;
-const height = 450 - margin.top - margin.bottom;
+const height = 500 - margin.top - margin.bottom;
 
 const svg = d3.select("#chart-container")
     .append("svg")
@@ -15,10 +15,10 @@ const expansionState = {
     "OrdersTable": false
 };
 
-// 2. Define Table Colors Map (Neutral vs Highlighted states)
+// 2. Table Colors Map
 const tableColors = {
-    "UsersTable": { default: "#3b82f6", active: "#60a5fa" },   // Blue / Light Blue
-    "OrdersTable": { default: "#10b981", active: "#34d399" }  // Green / Emerald Green
+    "UsersTable": { default: "#3b82f6", active: "#60a5fa" },
+    "OrdersTable": { default: "#10b981", active: "#34d399" }
 };
 
 // 3. Stable Source Schema Configuration
@@ -56,14 +56,16 @@ updateGraphLayout();
 function updateGraphLayout() {
     svg.selectAll("*").remove();
 
-    // Keep nodes completely fixed to prevent items jumping around
+    // Map fixed nodes array
     const nodes = [
         { id: "UsersTable", name: "Users Table", type: "source" },
         { id: "OrdersTable", name: "Orders Table", type: "source" }
     ];
-    resultNodes.forEach(r => nodes.push(JSON.parse(JSON.stringify(r))));
+    resultNodes.forEach(r => {
+        nodes.push({ id: r.id, title: r.title, tuples: r.tuples, type: r.type });
+    });
 
-    // Consolidate connection data paths
+    // Build connections array
     const links = [];
     sourceTables.forEach(table => {
         table.tuples.forEach(tuple => {
@@ -77,57 +79,62 @@ function updateGraphLayout() {
         });
     });
 
+    // Initialize layout builder configuration
     const sankey = d3.sankey()
         .nodeId(d => d.id)
         .nodeWidth(220)
-        .nodePadding(80) 
+        .nodePadding(90) 
         .extent([[0, 0], [width, height]]);
 
-    const computedGraph = sankey({ nodes: JSON.parse(JSON.stringify(nodes)), links: JSON.parse(JSON.stringify(links)) });
+    // FIX: Pass standard mutable data structures directly into the layout engine
+    const computedGraph = sankey({ nodes: nodes, links: links });
 
-    // 4. FIX: Use a Custom SVG Path Generator function to cleanly align endpoints safely
-    function drawPerfectLine(d) {
+    // 4. BOUNDED THICKNESS ENDPOINT CALCULATOR
+    function drawWireBundle(d) {
         const isExpanded = expansionState[d.source.id];
         let startX = d.source.x1;
-        let startY = d.source.y0 + 20; // Default collapsed center point
+        let startY = d.source.y0 + 20; // Default center line anchor
 
         if (isExpanded) {
             const table = sourceTables.find(t => t.id === d.source.id);
             const tupleIndex = table.tuples.findIndex(t => t.id === d.tupleId);
             if (tupleIndex !== -1) {
-                startY = d.source.y0 + 46 + (tupleIndex * 18); // Dynamic source row alignment
+                startY = d.source.y0 + 46 + (tupleIndex * 18); // Map perfectly straight from tuple line text
             }
+        } else {
+            // SPREAD ALIGNMENT: Slightly shift points vertically based on metadata value
+            // Capped strictly at ±12px from center so lines NEVER spill outside the box boundaries
+            const offsetMultiplier = Math.min(1.5, 12 / d.value); 
+            startY = d.source.y0 + 20 + (d.value * offsetMultiplier * (d.tupleId === "S1" || d.tupleId === "S3" ? -1 : 1));
         }
 
         let endX = d.target.x0;
-        let endY = d.target.y0 + 42; // Default first result tuple row alignment
+        let endY = d.target.y0 + 42; 
 
-        // Route row offsets precisely based on the targeting destination IDs
+        // Split incoming streams slightly inside target boxes to simulate multi-source thickness profiles
         if (d.target.id === "R1") {
-            endY = d.target.y0 + 42; // Row 1: Alice text line
+            const streamOffset = d.tableId === "UsersTable" ? -5 : 5;
+            endY = d.target.y0 + 42 + streamOffset;
         } else if (d.target.id === "R2") {
-            endY = d.target.y0 + 42; // Row 1: Bob text line
+            endY = d.target.y0 + 42;
         } else if (d.target.id === "R3") {
-            endY = d.target.y0 + 42; // Row 1: Global metrics text line
+            endY = d.target.y0 + 42;
         }
 
-        // Draw a clean, custom Cubic Bézier curve profile
         const controlX = (startX + endX) / 2;
         return `M ${startX} ${startY} C ${controlX} ${startY}, ${controlX} ${endY}, ${endX} ${endY}`;
     }
 
-    // Render connection paths with table-specific color assignment
+    // Render connection paths with customized data scaling
     linkElement = svg.append("g")
         .selectAll(".link")
         .data(computedGraph.links)
         .join("path")
         .attr("class", "link")
-        .attr("d", drawPerfectLine) // Swapped to our custom drawing script
+        .attr("d", drawWireBundle)
         .attr("stroke", d => tableColors[d.tableId].default)
-        .attr("stroke-width", d => {
-            const isSourceExpanded = expansionState[d.source.id];
-            return isSourceExpanded ? 2 : Math.min(Math.max(4, d.value * 1.2), 14);
-        })
+        // Laser lines when expanded; clean, controlled data-proportional widths when collapsed
+        .attr("stroke-width", d => expansionState[d.source.id] ? 2 : Math.min(Math.max(3, d.value * 0.8), 10))
         .attr("fill", "none");
 
     // Render nodes containers
@@ -200,7 +207,7 @@ function updateGraphLayout() {
     });
 }
 
-// 6. Interaction Management
+// 5. Interaction Management
 function handleNodeClick(event, d) {
     if (d.type === "source") {
         expansionState[d.id] = !expansionState[d.id];
