@@ -247,3 +247,9 @@ export function updateGraphLayout() {
         nodeElement.classed("active-node", false).classed("dimmed", false);
     }
 }
+
+// Listen for the global event broadcast independently at the file footer
+window.addEventListener('lineage-tab-visible', () => {
+    console.log("Lineage module intercepted tab transition alert. Redrawing D3 elements...");
+    updateGraphLayout();
+});
