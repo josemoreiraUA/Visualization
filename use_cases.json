@@ -1,0 +1,8 @@
+{
+    "Data loader": [],
+    "Lineage": ["Data/employees.parquet"],
+    "K-nn": ["Data/employees.parquet", "Data/orders.parquet"],   
+    "Fairness": ["Data/abc.csv", "Data/xyz.csv"],
+    "Decision tree": ["Data/employees.parquet", "Data/xya.csv"],
+    "About": []
+}

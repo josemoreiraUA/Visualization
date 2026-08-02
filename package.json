@@ -1,0 +1,25 @@
+{
+  "name": "visualization",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josemoreiraUA/Visualization.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/josemoreiraUA/Visualization/issues"
+  },
+  "homepage": "https://github.com/josemoreiraUA/Visualization#readme",
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
+    "d3": "^7.9.0",
+    "d3-sankey": "^0.12.3"
+  }
+}

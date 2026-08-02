@@ -1,250 +1,307 @@
-const margin = {top: 40, right: 220, bottom: 40, left: 220};
-const width = 1100 - margin.left - margin.right;
-const height = 500 - margin.top - margin.bottom;
+import * as d3 from 'd3';
+import * as duckdb from '@duckdb/duckdb-wasm';
 
-const svg = d3.select("#chart-container")
-    .append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
-    .attr("transform", `translate(${margin.left},${margin.top})`);
+// Import your custom graph engine setup script 
+import { updateGraphLayout } from './lineage.js';
+// Application Central State Management Registry
+let useCaseConfig = {};
+const loadedFileNamesSet = new Set();
+let duckDbInstance = null;
+let duckDbConnection = null;
 
-// 1. Dynamic Toggle State tracker
-const expansionState = {
-    "UsersTable": false,
-    "OrdersTable": false
-};
+// Initialize layout actions on loading completion
+document.addEventListener('DOMContentLoaded', () => {
+    initTabNavigation();
+    initHelpAccordion();
+    loadUseCaseConfigJSON();
+    initDuckDatabaseEngine();
+    initFileUploadHandler();
+});
 
-// 2. Table Colors Map
-const tableColors = {
-    "UsersTable": { default: "#3b82f6", active: "#60a5fa" },
-    "OrdersTable": { default: "#10b981", active: "#34d399" }
-};
-
-// 3. Stable Source Schema Configuration
-const sourceTables = [
-    {
-        id: "UsersTable",
-        name: "Users Table",
-        tuples: [
-            { id: "S1", name: "Tuple #101 (Alice)", targetId: "R1", value: 8 },
-            { id: "S2", name: "Tuple #102 (Bob)", targetId: "R2", value: 6 }
-        ]
-    },
-    {
-        id: "OrdersTable",
-        name: "Orders Table",
-        tuples: [
-            { id: "S3", name: "Tuple #901 ($50)", targetId: "R1", value: 4 },
-            { id: "S4", name: "Tuple #902 ($120)", targetId: "R1", value: 4 },
-            { id: "S5", name: "Tuple #903 (Audit)", targetId: "R3", value: 12 }
-        ]
-    }
-];
-
-const resultNodes = [
-    { id: "R1", title: "User Revenue View", tuples: ["Alice - Total: $170", "Status: Active Verified", "Partition: Node-0A"], type: "result" },
-    { id: "R2", title: "Zero Balance View", tuples: ["Bob - Total: $0", "Status: Idle Hibernated"], type: "result" },
-    { id: "R3", title: "System Audit Logs", tuples: ["Global Aggregation Sum", "Validation Checksum: OK"], type: "result" }
-];
-
-let linkElement, nodeElement;
-let selectedNode = null;
-
-updateGraphLayout();
-
-function updateGraphLayout() {
-    svg.selectAll("*").remove();
-
-    // Map fixed nodes array
-    const nodes = [
-        { id: "UsersTable", name: "Users Table", type: "source" },
-        { id: "OrdersTable", name: "Orders Table", type: "source" }
-    ];
-    resultNodes.forEach(r => {
-        nodes.push({ id: r.id, title: r.title, tuples: r.tuples, type: r.type });
-    });
-
-    // Build connections array
-    const links = [];
-    sourceTables.forEach(table => {
-        table.tuples.forEach(tuple => {
-            links.push({
-                source: table.id,
-                target: tuple.targetId,
-                value: tuple.value,
-                tupleId: tuple.id,
-                tableId: table.id 
-            });
+// 1. Tab Views Swapping Mechanism
+function initTabNavigation() {
+    const buttons = document.querySelectorAll('.nav-btn');
+    buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (btn.hasAttribute('disabled')) return;
+            
+            // Remove active classes from all items
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active-tab'));
+            document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active-view'));
+            
+            // Activate selected tab targets
+            btn.classList.add('active-tab');
+            const targetId = btn.getAttribute('data-target');
+            document.getElementById(targetId).classList.add('active-view');
         });
-    });
-
-    // Initialize layout builder configuration
-    const sankey = d3.sankey()
-        .nodeId(d => d.id)
-        .nodeWidth(220)
-        .nodePadding(90) 
-        .extent([[0, 0], [width, height]]);
-
-    // FIX: Pass standard mutable data structures directly into the layout engine
-    const computedGraph = sankey({ nodes: nodes, links: links });
-
-    // 4. BOUNDED THICKNESS ENDPOINT CALCULATOR
-    function drawWireBundle(d) {
-        const isExpanded = expansionState[d.source.id];
-        let startX = d.source.x1;
-        let startY = d.source.y0 + 20; // Default center line anchor
-
-        if (isExpanded) {
-            const table = sourceTables.find(t => t.id === d.source.id);
-            const tupleIndex = table.tuples.findIndex(t => t.id === d.tupleId);
-            if (tupleIndex !== -1) {
-                startY = d.source.y0 + 46 + (tupleIndex * 18); // Map perfectly straight from tuple line text
-            }
-        } else {
-            // SPREAD ALIGNMENT: Slightly shift points vertically based on metadata value
-            // Capped strictly at ±12px from center so lines NEVER spill outside the box boundaries
-            const offsetMultiplier = Math.min(1.5, 12 / d.value); 
-            startY = d.source.y0 + 20 + (d.value * offsetMultiplier * (d.tupleId === "S1" || d.tupleId === "S3" ? -1 : 1));
-        }
-
-        let endX = d.target.x0;
-        let endY = d.target.y0 + 42; 
-
-        // Split incoming streams slightly inside target boxes to simulate multi-source thickness profiles
-        if (d.target.id === "R1") {
-            const streamOffset = d.tableId === "UsersTable" ? -5 : 5;
-            endY = d.target.y0 + 42 + streamOffset;
-        } else if (d.target.id === "R2") {
-            endY = d.target.y0 + 42;
-        } else if (d.target.id === "R3") {
-            endY = d.target.y0 + 42;
-        }
-
-        const controlX = (startX + endX) / 2;
-        return `M ${startX} ${startY} C ${controlX} ${startY}, ${controlX} ${endY}, ${endX} ${endY}`;
-    }
-
-    // Render connection paths with customized data scaling
-    linkElement = svg.append("g")
-        .selectAll(".link")
-        .data(computedGraph.links)
-        .join("path")
-        .attr("class", "link")
-        .attr("d", drawWireBundle)
-        .attr("stroke", d => tableColors[d.tableId].default)
-        // Laser lines when expanded; clean, controlled data-proportional widths when collapsed
-        .attr("stroke-width", d => expansionState[d.source.id] ? 2 : Math.min(Math.max(3, d.value * 0.8), 10))
-        .attr("fill", "none");
-
-    // Render nodes containers
-    nodeElement = svg.append("g")
-        .selectAll(".node")
-        .data(computedGraph.nodes)
-        .join("g")
-        .attr("class", "node")
-        .attr("transform", d => `translate(${d.x0},${d.y0})`)
-        .on("click", handleNodeClick);
-
-    // Draw main background shapes
-    nodeElement.append("rect")
-        .attr("class", "main-box")
-        .attr("height", d => {
-            if (d.type === "result") return 75;
-            if (expansionState[d.id]) {
-                const table = sourceTables.find(t => t.id === d.id);
-                return 40 + (table.tuples.length * 18) + 10;
-            }
-            return 40; 
-        })
-        .attr("width", sankey.nodeWidth())
-        .attr("fill", d => {
-            if (d.type === "result") return "#1e1b4b";
-            return d.id === "UsersTable" ? "#1e3a8a" : d.id === "OrdersTable" ? "#064e3b" : "#1e3a8a";
-        })
-        .attr("stroke", d => {
-            if (d.type === "result") return "#818cf8";
-            return tableColors[d.id] ? tableColors[d.id].default : "#3b82f6";
-        })
-        .attr("stroke-width", 1.5);
-
-    // Render box header titles
-    nodeElement.append("text")
-        .attr("x", 12)
-        .attr("y", 22)
-        .attr("font-size", "11px")
-        .attr("font-weight", "bold")
-        .attr("fill", d => d.type === "source" ? "#38bdf8" : "#c7d2fe")
-        .text(d => {
-            if (d.type === "result") return d.title;
-            const icon = expansionState[d.id] ? "⊟" : "⊞";
-            return `${icon} ${d.name}`;
-        });
-
-    // Dynamically inject text rows inside BOTH left and right boxes
-    nodeElement.each(function(d) {
-        const currentBox = d3.select(this);
-
-        if (d.type === "result" && d.tuples) {
-            d.tuples.forEach((tupleText, index) => {
-                currentBox.append("text")
-                    .attr("class", "tuple-row")
-                    .attr("x", 16)
-                    .attr("y", 42 + (index * 15))
-                    .text(`• ${tupleText}`);
-            });
-        } 
-        else if (d.type === "source" && expansionState[d.id]) {
-            const table = sourceTables.find(t => t.id === d.id);
-            table.tuples.forEach((tuple, index) => {
-                currentBox.append("text")
-                    .attr("class", "tuple-row")
-                    .attr("x", 16)
-                    .attr("y", 46 + (index * 18))
-                    .text(`• ${tuple.name}`);
-            });
-        }
     });
 }
 
-// 5. Interaction Management
-function handleNodeClick(event, d) {
-    if (d.type === "source") {
-        expansionState[d.id] = !expansionState[d.id];
-        selectedNode = null;
-        updateGraphLayout();
-        return;
-    }
-
-    if (selectedNode === d.id) {
-        resetHighlighting();
-        return;
-    }
+// 2. Expandable Accordion Widget Handler
+function initHelpAccordion() {
+    const accordion = document.getElementById('help-accordion');
+    const previewSpan = document.getElementById('help-text-preview');
+    const iconSpan = document.getElementById('help-toggle-icon');
     
-    selectedNode = d.id;
-    const activeLinks = new Set();
-    const activeNodes = new Set([d.id]);
+    const fullTextStr = "Instructions: Load required datasets to unblock specific features. To activate specific analysis views, upload the matching parquet filenames specified in your environment configuration profile (use_cases.json). Once verified, buttons will instantly unlock.";
 
-    d.targetLinks.forEach(l => {
-        activeLinks.add(l);
-        activeNodes.add(l.source.id);
+    accordion.addEventListener('click', () => {
+        const isCollapsed = accordion.classList.toggle('collapsed');
+        if (isCollapsed) {
+            previewSpan.textContent = "Instructions: Load required datasets to unblock specific features...";
+            iconSpan.textContent = "▼";
+        } else {
+            previewSpan.textContent = "Instructions:";
+            iconSpan.textContent = "▲";
+        }
     });
-
-    linkElement
-        .classed("active", l => activeLinks.has(l))
-        .classed("dimmed", l => !activeLinks.has(l))
-        .style("stroke", l => activeLinks.has(l) ? tableColors[l.tableId].active : tableColors[l.tableId].default); 
-
-    nodeElement
-        .classed("active-node", n => n.id === d.id)
-        .classed("dimmed", n => !activeNodes.has(n.id));
 }
 
-function resetHighlighting() {
-    selectedNode = null;
-    linkElement
-        .classed("active", false)
-        .classed("dimmed", false)
-        .style("stroke", d => tableColors[d.tableId].default); 
-    nodeElement.classed("active-node", false).classed("dimmed", false);
+// 3. Load Use Cases Matrix Configurations Profiles
+async function loadUseCaseConfigJSON() {
+    try {
+        const response = await fetch('/use_cases.json');
+        useCaseConfig = await response.json();
+        evaluateButtonUnlockingStates();
+    } catch (err) {
+        console.error("Failed to parse use_cases.json profile configuration mapping matrix:", err);
+    }
 }
+
+// 4. Evaluate and Adjust Button Disabling Rules
+function evaluateButtonUnlockingStates() {
+    const mappings = [
+        { btnId: "btn-lineage", key: "Lineage" },
+        { btnId: "btn-knn", key: "K-nn" },
+        { btnId: "btn-fairness", key: "Fairness" },
+        { btnId: "btn-decision-tree", key: "Decision tree" }
+    ];
+
+    mappings.forEach(map => {
+        const targetBtn = document.getElementById(map.btnId);
+        const requiredFilesList = useCaseConfig[map.key] || [];
+        
+        // Fix: If a button needs "Data/employees.parquet", extract "employees.parquet" to match file.name
+        const metRequirements = requiredFilesList.every(filePath => {
+            const cleanFileName = filePath.split('/').pop(); 
+            return loadedFileNamesSet.has(cleanFileName);
+        });
+
+        if (metRequirements && requiredFilesList.length > 0) {
+            targetBtn.removeAttribute('disabled');
+        } else {
+            targetBtn.setAttribute('disabled', 'true');
+        }
+    });
+}
+
+// 5. Setup Local DuckDB Web Worker Instances Engine Connection
+// REPLACED: Enhanced connection loop utilizing secure local Object Blob mapping
+// 5. Setup Bundler-Safe DuckDB Web Worker Environment
+async function initDuckDatabaseEngine() {
+    try {
+        // FIX: Extract the core namespace dynamically to handle Vite CommonJS grouping wrappers safely
+        const duckdbModule = duckdb.ConsoleLogger ? duckdb : (duckdb.default || duckdb);
+
+        // Fetch local module/worker paths from your dependencies installation
+        const allBundles = duckdbModule.getJsDelivrBundles();
+        const chosenBundle = await duckdbModule.selectBundle(allBundles);
+
+        // Instantiate the logger from the safe module wrapper reference
+        const logger = new duckdbModule.ConsoleLogger();
+        
+        // Wrap the bundle workers smoothly inside a dynamic safe runtime script blob
+        const workerBlobUrl = URL.createObjectURL(
+            new Blob([`importScripts("${chosenBundle.mainWorker}");`], { type: 'text/javascript' })
+        );
+        const worker = new Worker(workerBlobUrl);
+        
+        duckDbInstance = new duckdbModule.AsyncDuckDB(logger, worker);
+        await duckDbInstance.instantiate(chosenBundle.mainModule, chosenBundle.pthreadWorker);
+        
+        duckDbConnection = await duckDbInstance.connect();
+        URL.revokeObjectURL(workerBlobUrl);
+        
+        console.log("DuckDB WASM Engine connected successfully!");
+        
+        // Clear any previous error/unreachable markers from the presentation area
+        document.getElementById('preview-table-container').innerHTML = '';
+    } catch (err) {
+        console.error("Failed to connect to local DuckDB bundle instance:", err);
+        document.getElementById('preview-table-container').innerHTML = `
+            <div style="background-color: #451a03; border: 1px solid #f59e0b; padding: 15px; color: #fef3c7; border-radius: 6px; font-family: monospace;">
+                <strong>Database Engine Initialization Error:</strong><br>
+                <p style="margin: 5px 0 0 0; font-size: 13px;">${err.message}</p>
+            </div>`;
+    }
+}
+
+
+
+// 6. Manage File Upload Input Parsing Buffers
+// 6. Manage File Upload Input Parsing Buffers
+function initFileUploadHandler() {
+    const input = document.getElementById('parquet-picker');
+    input.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        // FIX: Safely resolve the dynamic namespace wrapper from Vite
+        const duckdbModule = duckdb.ConsoleLogger ? duckdb : (duckdb.default || duckdb);
+
+        for (const file of files) {
+            if (!loadedFileNamesSet.has(file.name)) {
+                if (duckDbInstance) {
+                    await duckDbInstance.registerFileHandle(
+                        file.name,
+                        file,
+                        duckdbModule.DuckDBDataProtocol.BROWSER_FILEREADER, // Fix: use duckdbModule wrapper here
+                        true
+                    );
+                }
+                loadedFileNamesSet.add(file.name);
+            }
+        }
+        
+        renderLoadedFilesListUI();
+        evaluateButtonUnlockingStates();
+        input.value = ''; // Reset file input descriptor state
+    });
+}
+
+
+// 7. Render Uploaded File Storage Tracking Rows UI
+function renderLoadedFilesListUI() {
+    const listElement = document.getElementById('files-list');
+    listElement.innerHTML = '';
+
+    loadedFileNamesSet.forEach(fileName => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <span>📄 <strong>${fileName}</strong> (Loaded into Sandbox)</span>
+            <button class="preview-icon-btn" data-file="${fileName}" title="Preview First 10 Rows">🔍 Preview</button>
+        `;
+        
+        li.querySelector('.preview-icon-btn').addEventListener('click', (e) => {
+            const targetFile = e.target.getAttribute('data-file');
+            executePreviewRowExtraction(targetFile);
+        });
+
+        listElement.appendChild(li);
+    });
+}
+
+// 8. Execute SQL Limit Query and Draw HTML Output Grid
+async function executePreviewRowExtraction(fileName) {
+    const container = document.getElementById('preview-table-container');
+    container.innerHTML = `<p style="color:#38bdf8;">Querying execution stream for ${fileName}...</p>`;
+
+    // Detailed diagnostic check if database initialization fails
+    if (!duckDbConnection) {
+        container.innerHTML = `
+            <div style="background-color: #451a03; border: 1px solid #f59e0b; padding: 15px; color: #fef3c7; border-radius: 6px;">
+                <strong>Database Engine Unreachable</strong><br>
+                <p style="margin: 5px 0 0 0; font-size: 13px;">
+                    DuckDB could not spin up its Web Worker. If you are double-clicking <code>index.html</code> directly from your file system, browsers will block it. 
+                    Please run a local server (like VsCode Live Server) to resolve this security constraint.
+                </p>
+            </div>`;
+        return;
+    }
+
+    try {
+        // Run query safely wrapped in quotes to prevent token interpretation errors
+        const queryResponse = await duckDbConnection.query(`SELECT * FROM "${fileName}" LIMIT 10`);
+        const structuralRows = queryResponse.toArray();
+
+        if (structuralRows.length === 0) {
+            container.innerHTML = `<p>Query parsed successfully but file contains zero rows.</p>`;
+            return;
+        }
+
+        // FIX: Extract keys from the first actual data row row object, not the wrapper array container!
+        const keys = Object.keys(structuralRows[0]);
+        
+        let dynamicTableHTML = `
+            <table class="duck-preview-table">
+                <thead>
+                    <tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr>
+                </thead>
+                <tbody>
+                    ${structuralRows.map(row => `
+                        <tr>${keys.map(k => `<td>${row[k] !== null ? row[k] : ''}</td>`).join('')}</tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        
+        container.innerHTML = dynamicTableHTML;
+    } catch (err) {
+        container.innerHTML = `<p style="color:#ef4444;">SQL Read Exception Error: ${err.message}</p>`;
+    }
+}
+
+
+// Append this initialization function call inside your DOMContentLoaded event loop:
+// initSqlQueryConsoleHandler();
+
+function initSqlQueryConsoleHandler() {
+    const runBtn = document.getElementById('execute-sql-btn');
+    const queryInput = document.getElementById('custom-sql-input');
+    const container = document.getElementById('preview-table-container');
+
+    runBtn.addEventListener('click', async () => {
+        const sqlQueryRaw = queryInput.value.trim();
+        
+        if (!sqlQueryRaw) {
+            container.innerHTML = `<p style="color:#ef4444;">⚠️ The SQL command text input area cannot be empty.</p>`;
+            return;
+        }
+
+        if (!duckDbConnection) {
+            container.innerHTML = `<p style="color:#ef4444;">⚠️ DuckDB engine instance processing context is currently unavailable.</p>`;
+            return;
+        }
+
+        container.innerHTML = `<p style="color:#38bdf8;">Executing custom SQL statement analysis block...</p>`;
+
+        try {
+            // Directly parse and evaluate the user string query statement safely in the web sandbox
+            const queryResponse = await duckDbConnection.query(sqlQueryRaw);
+            const structuralRows = queryResponse.toArray();
+
+            if (structuralRows.length === 0) {
+                container.innerHTML = `<p style="color: #10b981;">✅ Execution successful. Query structural evaluation returned an empty set (0 rows).</p>`;
+                return;
+            }
+
+            // Map and extract schema column headers keys dynamically from the first record entry array
+            const keys = Object.keys(structuralRows[0]);
+            
+            let dynamicTableHTML = `
+                <table class="duck-preview-table">
+                    <thead>
+                        <tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr>
+                    </thead>
+                    <tbody>
+                        ${structuralRows.map(row => `
+                            <tr>${keys.map(k => `<td>${row[k] !== null ? row[k] : ''}</td>`).join('')}</tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            container.innerHTML = `<h4>Output Matrix Window (${structuralRows.length} rows returned):</h4>` + dynamicTableHTML;
+        } catch (err) {
+            // Gracefully push compile/syntax error context fields straight onto the canvas workspace view
+            container.innerHTML = `
+                <div style="background-color: #451a03; border: 1px solid #f59e0b; padding: 15px; color: #fef3c7; border-radius: 6px; font-family: monospace;">
+                    <strong>DuckDB Syntax Parse Exception:</strong><br>
+                    <pre style="white-space: pre-wrap; margin-top: 8px; font-size:12px;">${err.message}</pre>
+                </div>
+            `;
+        }
+    });
+}
+
+// Make sure to add initSqlQueryConsoleHandler(); inside your document DOMContentLoaded loop along with the other helpers!

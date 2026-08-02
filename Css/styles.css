@@ -1,0 +1,205 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: #0f172a;
+    color: #f8fafc;
+    margin: 20px;
+}
+h2 { 
+    text-align: center; 
+    color: #38bdf8; 
+    margin-bottom: 5px; 
+}
+p { 
+    text-align: center; 
+    color: #94a3b8; 
+    font-size: 14px; 
+    margin-top: 0; 
+}
+#chart-container {
+    width: 1050px;
+    margin: 0 auto;
+    background: #2b3341;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    min-height: 480px;
+}
+.node rect.main-box {
+    cursor: pointer;
+    rx: 6px;
+}
+/* Style for text rows nested INSIDE the right-side blue boxes */
+.tuple-row {
+    font-size: 11px;
+    fill: #cbd5e1;
+    pointer-events: none; /* Allows click events to hit the parent wrapper card */
+}
+.link {
+    fill: none;
+    stroke-opacity: 0.25;
+    transition: stroke 0.3s, stroke-opacity 0.3s, stroke-width 0.3s;
+}
+/* Flow line animations on active selected lineage paths */
+.link.active {
+    stroke-opacity: 0.9 !important;
+    stroke-dasharray: 8, 4;
+    animation: flow 1s linear infinite;
+}
+@keyframes flow {
+    from { stroke-dashoffset: 24; }
+    to { stroke-dashoffset: 0; }
+}
+.node.dimmed, .link.dimmed {
+    opacity: 0.15;
+}
+.node.active-node rect.main-box {
+    stroke: #38bdf8 !important;
+    stroke-width: 2px;
+}
+
+/* --- Navigation Tab System Panel --- */
+#nav-panel {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin: 20px auto;
+    width: 1050px;
+}
+.nav-btn {
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    background-color: #334155;
+    color: #eaf0f7;
+}
+/* Individual Color Definitions for Active States */
+#btn-data-loader.active-tab { background-color: #ec4899 !important; color: #fff; }
+#btn-lineage.active-tab     { background-color: #38bdf8 !important; color: #0f172a; }
+#btn-knn.active-tab         { background-color: #10b981 !important; color: #fff; }
+#btn-fairness.active-tab    { background-color: #f59e0b !important; color: #fff; }
+#btn-decision-tree.active-tab { background-color: #8b5cf6 !important; color: #fff; }
+#btn-about.active-tab        { background-color: #64748b !important; color: #fff; }
+
+/* Enabled but resting styles */
+.nav-btn:not([disabled]):hover {
+    transform: translateY(-1px);
+    filter: brightness(1.2);
+}
+/* Locked button states */
+.nav-btn[disabled] {
+    background-color: #1e293b !important;
+    color: #a5a6a9 !important;
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+/* --- Modular View Panels visibility toggling --- */
+.view-panel {
+    display: none;
+}
+.view-panel.active-view {
+    display: block;
+}
+
+/* --- Expandable Information Widget Component --- */
+#help-accordion {
+    width: 1010px;
+    margin: 15px auto;
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px 20px;
+    cursor: pointer;
+    overflow: hidden;
+}
+#help-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #38bdf8;
+    font-weight: 600;
+}
+#help-full-content {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #cbd5e1;
+    line-height: 1.5;
+}
+/* Collapsed state hidden content engine rules */
+#help-accordion.collapsed #help-full-content {
+    display: none;
+}
+.help-desc {
+    text-align: left !important;
+    color: #cbd5e1 !important;
+}
+
+/* --- Data Loader Sub-elements Components --- */
+.loader-box {
+    width: 1010px;
+    margin: 10px auto;
+    text-align: center;
+}
+.file-drop-label {
+    display: inline-block;
+    padding: 12px 24px;
+    background-color: #1e293b;
+    border: 2px dashed #475569;
+    border-radius: 6px;
+    color: #f8fafc;
+    font-weight: 600;
+    cursor: pointer;
+}
+.file-drop-label:hover {
+    border-color: #38bdf8;
+}
+#loaded-files-section, #preview-section {
+    width: 1010px;
+    margin: 20px auto;
+}
+#files-list {
+    list-style: none;
+    padding: 0;
+}
+#files-list li {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background-color: #1e293b;
+    padding: 8px 15px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+.preview-icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+/* --- Dynamic Table Data Output --- */
+.duck-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 10px;
+    background-color: #1e293b;
+}
+.duck-preview-table th {
+    background-color: #0f172a;
+    color: #38bdf8;
+    padding: 8px;
+    text-align: left;
+    border: 1px solid #334155;
+}
+.duck-preview-table td {
+    padding: 8px;
+    border: 1px solid #334155;
+    color: #e2e8f0;
+}

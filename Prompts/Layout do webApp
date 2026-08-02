@@ -1,0 +1,47 @@
+# Rollback to previous version
+I want to go back to the version of the website with a single page to display the connections between tuples in the data sources and tuples in the query results, and ignore all the other features and propmts issues after that version. The reference code for my development from now on is in the following repository: https://github.com/josemoreiraUA/Visualization.
+
+1. I want to change the background of the websiteU use light colors rather than dark grey. The other colors may also change, if required. In the end, I want a nice and soft layoyt.
+
+# Reset
+My current project's structure is:
+Css
+  |- styles.css
+Javascript
+  |- app.js
+index.html
+
+My current index.html is:
+
+My current lineage.js is:
+
+My current styles.css is:
+
+
+# Webpage Layout
+1. I want to add a div below the page title 'Database Query Provenance' with 6 nice (coloured) buttons with labels:
+    + Data loader
+    + Lineage: this button displays the chart container in lineage.js
+    + K-nn
+    + Fairness
+    + Decision tree
+    + About
+
+2. The data loader will have a container to upload files. This button and the About button are always active. Indeed, the buttons must be activated or deactivated acoording to the use_cases.json file that i added in the project's root with the following contents: 
+{
+    "Data loader": [],
+    "Lineage": ["Data/employees.parquet"],
+    "K-nn": ["Data/employees.parquet", "Data/orders.parquet"],   
+    "Fairness": ["Data/abc.csv", "Data/xyz.csv"],
+    "Decision tree": ["Data/employees.parquet", "Data/xya.csv"],
+    "About": []
+}
+
+    Each key is related to a button / container in my web app and the values are the files that must be loaded to enable the buttons.
+
++ Below, I want to have a div the can be expanded or colapsed to explain what the user must do. When colapsed it only displays the first line plus '...'; when expanded it shows everything.
+
++ Below, I want a file picker to add files. I want to keep a list of the names of the files loaded, with an icon to enable displaying the first 10 lines of each file. The file contents are displayed in a div below this one.
+    All my files are in parquet and I want to use DuckDB.WASM. I already have a folder Parquet_viewer\Public\ with the files Parquet_viewer\Public\duckdb\duckdb-browser-eh.worker.js and Parquet_viewer\Public\duckdb\duckdb-browser-eh.worker.js.
+
+3. The Lineage button displays the container handled in lineage.js
