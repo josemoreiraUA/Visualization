@@ -1,12 +1,24 @@
-// A. Add these explicit module imports at the absolute top of your lineage.js file
 import * as d3 from 'd3';
 import { sankey as d3Sankey } from 'd3-sankey';
 
-// B. Wrap your original logic inside an exported function so app.js can invoke it
+//  FIX 1: Move the Expansion Tracking Registry OUTSIDE the function to preserve states globally
+const expansionState = {
+    "UsersTable": false,
+    "OrdersTable": false
+};
+
+//  FIX 2: Move Table Colors Map outside as well for clean, persistent reference scoping
+const tableColors = {
+    "UsersTable": { default: "#3b82f6", active: "#60a5fa" },
+    "OrdersTable": { default: "#10b981", active: "#34d399" }
+};
+
 export function updateGraphLayout() {
-    
-    // Clear out the previous layout completely before drawing a new tab panel
-    d3.select("#chart-container").selectAll("*").remove();
+    console.log("=== [LINEAGE] updateGraphLayout() triggered ===");
+
+    // Clear layout container layer
+    const container = d3.select("#chart-container");
+    container.selectAll("*").remove();
 
     const margin = {top: 40, right: 220, bottom: 40, left: 220};
     const width = 1100 - margin.left - margin.right;
@@ -19,19 +31,8 @@ export function updateGraphLayout() {
         .append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // 1. Dynamic Toggle State tracker
-    const expansionState = {
-        "UsersTable": false,
-        "OrdersTable": false
-    };
+    // ❌ REMOVED/DELETED: expansionState and tableColors from here!
 
-    // 2. Table Colors Map
-    const tableColors = {
-        "UsersTable": { default: "#3b82f6", active: "#60a5fa" },
-        "OrdersTable": { default: "#10b981", active: "#34d399" }
-    };
-
-    // 3. Stable Source Schema Configuration
     const sourceTables = [
         {
             id: "UsersTable",
@@ -61,7 +62,6 @@ export function updateGraphLayout() {
     let linkElement, nodeElement;
     let selectedNode = null;
 
-    // Map fixed nodes array
     const nodes = [
         { id: "UsersTable", name: "Users Table", type: "source" },
         { id: "OrdersTable", name: "Orders Table", type: "source" }
@@ -70,7 +70,6 @@ export function updateGraphLayout() {
         nodes.push({ id: r.id, title: r.title, tuples: r.tuples, type: r.type });
     });
 
-    // Build connections array
     const links = [];
     sourceTables.forEach(table => {
         table.tuples.forEach(tuple => {
@@ -84,17 +83,14 @@ export function updateGraphLayout() {
         });
     });
 
-    // C. FIX: Call d3Sankey() directly from the module import rather than d3.sankey()
     const sankey = d3Sankey()
         .nodeId(d => d.id)
         .nodeWidth(220)
         .nodePadding(90) 
         .extent([[0, 0], [width, height]]);
 
-    // Pass standard mutable data structures directly into the layout engine
     const computedGraph = sankey({ nodes: nodes, links: links });
 
-    // 4. BOUNDED THICKNESS ENDPOINT CALCULATOR
     function drawWireBundle(d) {
         const isExpanded = expansionState[d.source.id];
         let startX = d.source.x1;
@@ -123,7 +119,6 @@ export function updateGraphLayout() {
         return `M ${startX} ${startY} C ${controlX} ${startY}, ${controlX} ${endY}, ${endX} ${endY}`;
     }
 
-    // Render connection paths with customized data scaling
     linkElement = svg.append("g")
         .selectAll(".link")
         .data(computedGraph.links)
@@ -134,7 +129,6 @@ export function updateGraphLayout() {
         .attr("stroke-width", d => expansionState[d.source.id] ? 2 : Math.min(Math.max(3, d.value * 0.8), 10))
         .attr("fill", "none");
 
-    // Render nodes containers
     nodeElement = svg.append("g")
         .selectAll(".node")
         .data(computedGraph.nodes)
@@ -143,7 +137,6 @@ export function updateGraphLayout() {
         .attr("transform", d => `translate(${d.x0},${d.y0})`)
         .on("click", handleNodeClick);
 
-    // Draw main background shapes
     nodeElement.append("rect")
         .attr("class", "main-box")
         .attr("height", d => {
@@ -165,7 +158,6 @@ export function updateGraphLayout() {
         })
         .attr("stroke-width", 1.5);
 
-    // Render box header titles
     nodeElement.append("text")
         .attr("x", 12)
         .attr("y", 22)
@@ -178,7 +170,6 @@ export function updateGraphLayout() {
             return `${icon} ${d.name}`;
         });
 
-    // Dynamically inject text rows inside BOTH left and right boxes
     nodeElement.each(function(d) {
         const currentBox = d3.select(this);
 
@@ -203,13 +194,10 @@ export function updateGraphLayout() {
         }
     });
 
-    // 5. Interaction Management
     function handleNodeClick(event, d) {
         if (d.type === "source") {
             expansionState[d.id] = !expansionState[d.id];
             selectedNode = null;
-            
-            // Re-call internal routine on toggle change
             updateGraphLayout();
             return;
         }
@@ -248,8 +236,7 @@ export function updateGraphLayout() {
     }
 }
 
-// Listen for the global event broadcast independently at the file footer
+// 3. Attach window listener to broadcast channel trigger
 window.addEventListener('lineage-tab-visible', () => {
-    console.log("Lineage module intercepted tab transition alert. Redrawing D3 elements...");
     updateGraphLayout();
 });

@@ -26,7 +26,8 @@
             <div id="help-accordion" class="collapsed" style="overflow: hidden; box-sizing: border-box; margin-bottom: 20px; width: 100%;">
                 
                 <div id="help-header" style="display: flex; justify-content: space-between; align-items: center; font-family: sans-serif; font-size: 1.17em; color: #ffffff; font-weight: bold; cursor: pointer; user-select: none;">
-                    <span>Read me...</span>
+                    <!-- FIX: Re-added the missing id="help-text-preview" attribute tag to unblock data_loader.js line 58 -->
+                    <span id="help-text-preview">Read me...</span>
                     <span id="help-toggle-icon" style="color: #38bdf8;">▼</span>
                 </div>
                 
@@ -35,7 +36,6 @@
                         <p style="text-align: left; margin-bottom: 12px; margin-top: 0;">
                             Modern web browsers prevent web applications from accessing files stored on a user's computer without explicit permission. Therefore, the datasets required for the examples provided by this platform must be loaded into the application before they can be processed. All data remains on the user's machine and data processing is performed entirely within the browser using DuckDB-WASM, eliminating the need for a backend server or database installation.
                         </p>
-
                         <p style="text-align: left; margin: 0;">
                             The modules in the top navigation bar depend on specific input datasets and each module remains disabled until all of its required files have been loaded. Once loaded, the datasets can be previewed and queried using the integrated DuckDB SQL workspace.
                         </p>
@@ -90,7 +90,9 @@
             <p style="text-align:left; padding: 0 20px;">This environment traces database tuple operations natively inside your browser sandbox.</p>
         </div>
 
-        <!-- FIX: Only boot app.js as a native ES Module script -->
+        <!-- Only boot data_loader.js as a native ES Module script -->
         <script type="module" src="Javascript/data_loader.js"></script>
+        <!-- Explicitly register lineage.js so Vite parses its window listeners at boot time! -->
+        <script type="module" src="Javascript/lineage.js"></script>
     </body>
 </html>
