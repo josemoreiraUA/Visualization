@@ -69,15 +69,30 @@ p {
 /* ==========================================================================
    Information Accordion Component
    ========================================================================== */
+/* ==========================================================================
+   Information Accordion Component (No Bounding Box)
+   ========================================================================== */
 #help-accordion {
-    width: 1010px;
-    margin: 15px auto;
-    background-color: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 12px 20px;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 20px 0;
     cursor: pointer;
     overflow: hidden;
+}
+
+#help-accordion.collapsed #help-full-content {
+    display: none;
+}
+
+
+/* Consolidated Data Loader Structural Aligner Elements */
+#help-accordion,
+#loaded-files-section, 
+#query-console-section, 
+#preview-section {
+    width: 100%;
+    margin: 20px 0;
+    box-sizing: border-box;
 }
 #help-header {
     display: flex;
@@ -128,9 +143,12 @@ p {
 .file-drop-label:hover {
     border-color: #38bdf8;
 }
-#loaded-files-section, #preview-section {
-    width: 1010px;
-    margin: 20px auto;
+#loaded-files-section, 
+#query-console-section, 
+#preview-section {
+    width: 100%;
+    margin: 20px 0;
+    box-sizing: border-box;
 }
 #files-list {
     list-style: none;

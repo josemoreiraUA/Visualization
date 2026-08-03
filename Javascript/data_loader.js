@@ -13,6 +13,7 @@ let duckDbConnection = null;
 document.addEventListener('DOMContentLoaded', () => {
     initTabNavigation();
     initHelpAccordion();
+    initConsoleAccordion();
     loadUseCaseConfigJSON();
     initDuckDatabaseEngine();
     initFileUploadHandler();
@@ -63,12 +64,37 @@ function initHelpAccordion() {
     });
 }
 
+// 2.5 Manage Expandable Console Accordion Panel Transitions
+function initConsoleAccordion() {
+    const consoleContainer = document.getElementById('query-console-section');
+    const header = document.getElementById('console-accordion-header');
+    const content = document.getElementById('console-accordion-content');
+    const iconSpan = document.getElementById('console-toggle-icon');
+
+    if (!header || !consoleContainer || !content || !iconSpan) return;
+
+    header.addEventListener('click', () => {
+        // Toggle the collapsed flag state attribute dynamically
+        const isCollapsed = consoleContainer.classList.toggle('collapsed');
+        
+        if (isCollapsed) {
+            content.style.display = "none";
+            iconSpan.textContent = "▼";
+        } else {
+            content.style.display = "block";
+            iconSpan.textContent = "▲";
+        }
+    });
+}
+
+
 // 3. Load Use Cases Matrix Configurations Profiles
 async function loadUseCaseConfigJSON() {
     try {
         const response = await fetch('/use_cases.json');
         useCaseConfig = await response.json();
         evaluateButtonUnlockingStates();
+        renderStorageStatusUI(); 
     } catch (err) {
         console.error("Failed to parse use_cases.json profile configuration mapping matrix:", err);
     }
@@ -167,33 +193,83 @@ function initFileUploadHandler() {
             }
         }
         
-        renderLoadedFilesListUI();
+        renderStorageStatusUI();
         evaluateButtonUnlockingStates();
         input.value = ''; // Reset file input descriptor state
     });
 }
 
 
-// 7. Render Uploaded File Storage Tracking Rows UI
-function renderLoadedFilesListUI() {
-    const listElement = document.getElementById('files-list');
-    listElement.innerHTML = '';
+// 7. Render Use Cases Checklist Tracker with Dynamic Gray/Green Color Transitions
+// 7. Render Use Cases Checklist Tracker in a Single Line per Use Case
+function renderStorageStatusUI() {
+    const container = document.getElementById('storage-status-container');
+    if (!container || !useCaseConfig) return;
 
-    loadedFileNamesSet.forEach(fileName => {
-        const li = document.createElement('li');
-        li.innerHTML = `
-            <span>📄 <strong>${fileName}</strong> (Loaded into Sandbox)</span>
-            <button class="preview-icon-btn" data-file="${fileName}" title="Preview First 10 Rows">🔍 Preview</button>
-        `;
-        
-        li.querySelector('.preview-icon-btn').addEventListener('click', (e) => {
-            const targetFile = e.target.getAttribute('data-file');
-            executePreviewRowExtraction(targetFile);
+    container.innerHTML = '';
+
+    const relevantUseCases = ["Lineage", "K-nn", "Fairness", "Decision tree"];
+
+    relevantUseCases.forEach(useCaseKey => {
+        const requiredFiles = useCaseConfig[useCaseKey] || [];
+        if (requiredFiles.length === 0) return;
+
+        // Verify if all files in the requirement array are fully uploaded
+        const isUseCaseFullyLoaded = requiredFiles.every(filePath => {
+            const cleanFileName = filePath.split('/').pop();
+            return loadedFileNamesSet.has(cleanFileName);
         });
 
-        listElement.appendChild(li);
+        // Dynamic use case row coloring configuration metrics rules
+        const titleColor = isUseCaseFullyLoaded ? "#10b981" : "#94a3b8";
+
+        const rowItem = document.createElement('div');
+        rowItem.style.display = "flex";
+        rowItem.style.alignItems = "center";
+        rowItem.style.justifyContent = "space-between";
+        rowItem.style.backgroundColor = "#1e293b";
+        rowItem.style.padding = "10px 15px";
+        rowItem.style.borderRadius = "6px";
+        rowItem.style.marginBottom = "8px";
+        rowItem.style.fontSize = "13px";
+        rowItem.style.border = `1px solid ${isUseCaseFullyLoaded ? '#10b981' : '#334155'}`;
+
+        // Build out inline file names span grouping strings elements array
+        const filesSpanHTML = requiredFiles.map(filePath => {
+            const cleanFileName = filePath.split('/').pop();
+            const isFileLoaded = loadedFileNamesSet.has(cleanFileName);
+            const fileColor = isFileLoaded ? "#10b981" : "#94a3b8";
+            
+            // Render an inline preview shortcut link button directly next to loaded items
+            const previewBtn = isFileLoaded ? `<button class="preview-icon-btn" data-file="${cleanFileName}" style="padding: 2px 6px; font-size: 10px; margin-left: 4px; background-color: #334155; color: #38bdf8; border: none; border-radius: 4px; cursor: pointer;">🔍</button>` : '';
+
+            return `<span style="color: ${fileColor}; font-weight: 500;">${cleanFileName}${previewBtn}</span>`;
+        }).join('<span style="color: #475569; margin: 0 6px;">,</span> ');
+
+        rowItem.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <strong style="color: ${titleColor}; min-width: 110px;">${useCaseKey}:</strong>
+                <div style="display: flex; align-items: center; flex-wrap: wrap;">${filesSpanHTML}</div>
+            </div>
+            <div>
+                ${isUseCaseFullyLoaded ? '<span style="font-size: 11px; background: rgba(16,185,129,0.2); color: #10b981; padding: 2px 8px; border-radius: 4px; font-weight: bold;">Ready</span>' : ''}
+            </div>
+        `;
+
+        // Bind interactive event loops handlers to inline preview lenses
+        rowItem.querySelectorAll('.preview-icon-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Avoid triggering parent block bubbles clicks
+                const targetFile = btn.getAttribute('data-file');
+                executePreviewRowExtraction(targetFile);
+            });
+        });
+
+        container.appendChild(rowItem);
     });
 }
+
+
 
 // 8. Execute SQL  Query and Draw HTML Output Grid
 function renderDuckTable(queryResponse, container) {
@@ -239,6 +315,9 @@ async function executePreviewRowExtraction(fileName) {
 }
 
 // 9. Draw workspace headers from structuralRows[0] 
+// ==========================================================================
+// 9. Simplified Custom SQL Workspace Console Actions (With Unified Error Cards)
+// ==========================================================================
 function initSqlQueryConsoleHandler() {
     const runBtn = document.getElementById('execute-sql-btn');
     if (!runBtn) return;
@@ -251,8 +330,14 @@ function initSqlQueryConsoleHandler() {
         if (!queryInput || !container) return;
 
         const sqlQueryRaw = queryInput.value.trim();
+        
+        // CHANGED: Formatted the empty warning message to look exactly like the exception card
         if (!sqlQueryRaw) {
-            container.innerHTML = `<p style="color:#orange;">⚠️ The SQL text input console area is empty.</p>`;
+            container.innerHTML = `
+                <div style="background-color: #451a03; border: 1px solid #f59e0b; padding: 15px; color: #fef3c7; border-radius: 6px; font-family: monospace;">
+                    <strong>Workspace Input Warning:</strong><br>
+                    <pre style="white-space: pre-wrap; margin-top: 8px; font-size:12px; font-family: monospace;">The SQL text input console area is empty.</pre>
+                </div>`;
             return;
         }
 
@@ -265,7 +350,7 @@ function initSqlQueryConsoleHandler() {
             container.innerHTML = `
                 <div style="background-color: #451a03; border: 1px solid #f59e0b; padding: 15px; color: #fef3c7; border-radius: 6px; font-family: monospace;">
                     <strong>DuckDB Syntax Parse Exception:</strong><br>
-                    <pre style="white-space: pre-wrap; margin-top: 8px; font-size:12px;">${err.message}</pre>
+                    <pre style="white-space: pre-wrap; margin-top: 8px; font-size:12px; font-family: monospace;">${err.message}</pre>
                 </div>`;
         }
     });

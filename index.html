@@ -7,8 +7,7 @@
     </head>
     <body>
 
-        <h2>Database Query Provenance</h2>
-        <p>Click any node card to trace its input-to-output database query lineage.</p>
+        <h2>Data Provenance & XAI</h2>
 
         <!-- 1. Unified Navigation Button Panel Container -->
         <div id="nav-panel">
@@ -20,43 +19,65 @@
             <button id="btn-about" class="nav-btn" data-target="about-view">About</button>
         </div>
 
-        <!-- 2. Interactive Help Accordion Panel Widget -->
-        <div id="help-accordion" class="collapsed">
-            <div id="help-header">
-                <span id="help-text-preview">Instructions: Load required datasets to unblock specific features...</span>
-                <span id="help-toggle-icon">▼</span>
-            </div>
-            <div id="help-full-content">
-                <p class="help-desc">Welcome to the workbench. To activate specific analysis views, upload the matching parquet filenames specified in your environment configuration profile (`use_cases.json`). Once verified, buttons will instantly unlock.</p>
-            </div>
-        </div>
-
         <!-- 3. Target Views Containers -->
         <div id="data-loader-view" class="view-panel active-view">
+            
+            <!-- FIXED: Moved the Interactive Help Accordion inside the active data loader view wrapper -->
+            <div id="help-accordion" class="collapsed" style="overflow: hidden; box-sizing: border-box; margin-bottom: 20px; width: 100%;">
+                
+                <div id="help-header" style="display: flex; justify-content: space-between; align-items: center; font-family: sans-serif; font-size: 1.17em; color: #ffffff; font-weight: bold; cursor: pointer; user-select: none;">
+                    <span>Read me...</span>
+                    <span id="help-toggle-icon" style="color: #38bdf8;">▼</span>
+                </div>
+                
+                <div id="help-full-content" style="margin-top: 15px; font-family: sans-serif;">
+                    <div class="help-desc" style="text-align: left; color: #cbd5e1; line-height: 1.5; margin: 0;">
+                        <p style="text-align: left; margin-bottom: 12px; margin-top: 0;">
+                            Modern web browsers prevent web applications from accessing files stored on a user's computer without explicit permission. Therefore, the datasets required for the examples provided by this platform must be loaded into the application before they can be processed. All data remains on the user's machine and data processing is performed entirely within the browser using DuckDB-WASM, eliminating the need for a backend server or database installation.
+                        </p>
+
+                        <p style="text-align: left; margin: 0;">
+                            The modules in the top navigation bar depend on specific input datasets and each module remains disabled until all of its required files have been loaded. Once loaded, the datasets can be previewed and queried using the integrated DuckDB SQL workspace.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <div class="loader-box">
                 <label for="parquet-picker" class="file-drop-label">Choose Local Parquet Files</label>
                 <input type="file" id="parquet-picker" accept=".parquet" multiple style="display:none;" />
             </div>
             
             <div id="loaded-files-section">
-                <h3>Uploaded Virtual Storage Status:</h3>
-                <ul id="files-list"></ul>
+                <h3>Uploaded Virtual Storage Status</h3>
+                <div id="storage-status-container"></div>
             </div>
 
             <!-- SQL Query Workspace Console -->
-            <div id="query-console-section" style="width: 1010px; margin: 20px auto; font-family: sans-serif;">
-                <h3>Interactive SQL Workspace Console:</h3>
-                <textarea id="custom-sql-input" rows="4" style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 6px; padding: 12px; font-family: monospace; box-sizing: border-box;" placeholder="SELECT * FROM 'your_file.parquet' LIMIT 5"></textarea>
-                <button id="execute-sql-btn" style="margin-top: 10px; padding: 8px 20px; font-weight: bold; background-color: #38bdf8; color: #0f172a; border: none; border-radius: 6px; cursor: pointer;">Execute Query Statement</button>
+            <div id="query-console-section" class="collapsed" style="overflow: hidden; box-sizing: border-box; margin-bottom: 20px; width: 100%;">
+                <div id="console-accordion-header" style="display: flex; justify-content: space-between; align-items: left; font-family: sans-serif; font-size: 1.17em; color: #ffffff; font-weight: bold; cursor: pointer; user-select: none;">
+                    <span>Interactive SQL Workspace Console</span>
+                    <span id="console-toggle-icon" style="color: #38bdf8;">▼</span>
+                </div>
+
+                <!-- Collapsible Wrapper for the Textarea and Execute Button -->
+                <div id="console-accordion-content" style="margin-top: 15px; font-family: sans-serif; display: none;">
+                    <p style="text-align: left; color: #94a3b8; font-size: 13px; margin-bottom: 12px; margin-top: 0;">
+                        Run advanced custom analytical queries against your loaded memory tables (e.g. <code>SELECT * FROM 'employees.parquet' WHERE salary > 50000</code>).
+                    </p>
+                    <textarea id="custom-sql-input" rows="4" style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 6px; padding: 12px; font-family: monospace; box-sizing: border-box; resize: vertical;" placeholder="SELECT * FROM 'employees.parquet' LIMIT 5"></textarea>
+                    <button id="execute-sql-btn" style="margin-top: 10px; padding: 8px 20px; font-weight: bold; background-color: #38bdf8; color: #0f172a; border: none; border-radius: 6px; cursor: pointer;">Execute Query Statement</button>
+                </div>
             </div>
 
             <div id="preview-section">
-                <h3>Structured Record Row Data Viewer:</h3>
+                <h3>Structured Record Row Data Viewer</h3>
                 <div id="preview-table-container"></div>
             </div>
         </div>
 
         <div id="lineage-view" class="view-panel">
+            <p>Click any node card to trace its input-to-output database query lineage.</p>
             <div id="chart-container"></div>
         </div>
 
@@ -70,6 +91,6 @@
         </div>
 
         <!-- FIX: Only boot app.js as a native ES Module script -->
-        <script type="module" src="Javascript/app.js"></script>
+        <script type="module" src="Javascript/data_loader.js"></script>
     </body>
 </html>
