@@ -1,5 +1,9 @@
 import * as d3 from 'd3';
 
+// 1. GLOBAL VARIABLES (Declared outside so they can be modified by the loader function)
+let sourceData = { Training_actions: [], Employees_training_actions: [], Employees_training: [] };
+let resultNodes = [];
+
 // Persistent tracking of expand/collapse card drawers
 const expansionState = {
     "Training_actions": false,
@@ -14,10 +18,104 @@ const themeColors = {
     result: { bg: "#1e1b4b", stroke: "#818cf8" }
 };
 
-export function updateAggregatedGraphLayout() {
+// ==========================================================================
+// 2. DYNAMIC METADATA EXTRACTOR ENGINE FROM ALL THREE PARQUET FILES
+// ==========================================================================
+async function loadLineageFromParquetFiles(duckDb) {
+    if (!duckDb) return;
+    try {
+        console.log("📊 Pulling active runtime metadata from local Parquet storage blocks...");
+
+        // Query all three raw structural source tables from browser memory sandbox
+        const resActions = await duckDb.query("SELECT prov, name, hours, actionId FROM 'Training_actions.parquet'");
+        const resEmpActions = await duckDb.query("SELECT prov, name, actionId FROM 'Employees_training_actions.parquet'");
+        const resEmpTraining = await duckDb.query("SELECT prov, name, training_program, hours FROM 'Employees_training.parquet'");
+
+        // Populate Training_actions list dynamically
+        sourceData.Training_actions = resActions.toArray().map(row => ({
+            id: row.prov,
+            txt: `${row.prov}: ${row.name} (${row.hours}h)`,
+            actionId: row.actionId
+        }));
+
+        // Populate Employees_training_actions list dynamically
+        sourceData.Employees_training_actions = resEmpActions.toArray().map(row => {
+            const cleanActionNum = row.actionId ? row.actionId.replace('ACT-0', '').replace('ACT-', '') : '';
+            return {
+                id: row.prov,
+                txt: `${row.prov}: ${row.name} [${row.actionId}]`,
+                linksTo: cleanActionNum ? `a${cleanActionNum}` : null
+            };
+        });
+
+        // Populate Employees_training list dynamically
+        sourceData.Employees_training = resEmpTraining.toArray().map(row => ({
+            id: row.prov,
+            txt: `${row.prov}: ${row.name} - ${row.training_program} (${row.hours}h)`
+        }));
+
+        // Execute your exact annotated aggregate query statement across the schemas
+        const resultQuery = await duckDb.query(`
+            SELECT EA.name as Employee, SUM(T.hours) as hours, 
+                   '(' || STRING_AGG(EA.prov || ' · ' || T.prov || ' ⊗ ' || T.hours, '  +  ' ORDER BY EA.prov, T.prov) || ')' as prov
+            FROM   'Training_actions.parquet' T, 'Employees_training_actions.parquet' EA
+            WHERE  T.actionId = EA.actionId
+            GROUP BY EA.name
+            UNION ALL
+            SELECT ET.name, ET.hours, ET.prov as prov
+            FROM   'Employees_training.parquet' ET
+        `);
+
+        // Dynamically build the linkage line network paths based on the aggregated query output
+        resultNodes = resultQuery.toArray().map((row, idx) => {
+            const lineagePaths = [];
+            
+            if (row.prov && row.prov.startsWith('(')) {
+                // Strip the surrounding parentheses bounding wrappers
+                const cleanProv = row.prov.slice(1, -1);
+                // Split each algebraic term separated by the double-space '+' string operator
+                const tokens = cleanProv.split('  +  ');
+                
+                tokens.forEach(token => {
+                    // Example token format: "t1 · a3 ⊗ 6"
+                    const parts = token.split(' · ');
+                    if (parts.length >= 2) {
+                        // 🟢 FIXED: Extract strings using array brackets first before trimming!
+                        const midId = parts[0].trim(); // Pulls 't1' safely
+                        
+                        // Extract left column action ID token ('a3') by removing the trailing hours metric
+                        const remainder = parts[1];
+                        const leftId = remainder.split(' ⊗ ')[0].trim(); // Pulls 'a3' safely
+                        
+                        lineagePaths.push({ midId: midId, leftId: leftId, midTable: "Employees_training_actions" });
+                    }
+                });
+            } else if (row.prov) {
+                // Fallback route for standard linear industrial sector rows
+                lineagePaths.push({ midId: row.prov, leftId: null, midTable: "Employees_training" });
+            }
+
+            return {
+                id: `R${idx + 1}`,
+                name: row.Employee,
+                h: row.hours,
+                prov: row.prov,
+                lineage: lineagePaths
+            };
+        });
+
+
+        console.log("✅ Live database records successfully loaded into graph structures:", { sourceData, resultNodes });
+    } catch (err) {
+        console.error("❌ Failed to query and populate data from active Parquet context layers:", err);
+    }
+}
+
+
+// 3. GRAPH PLOTTING CALCULATION ENGINE
+export async function updateAggregatedGraphLayout() {
     console.log("=== [AGGREGATED LINEAGE] Initiating Layout Generator Pipeline ===");
 
-    //const container = d3.select("#chart-container");
     const container = d3.select("#chart-container-knn");
     container.selectAll("*").remove();
 
@@ -40,9 +138,13 @@ export function updateAggregatedGraphLayout() {
             .style("z-index", "1000");
     }
 
+    // Dynamic heights based on number of records loaded to prevent card clipping
+    const totalSourceRows = Math.max(sourceData.Training_actions.length, sourceData.Employees_training_actions.length + 2);
+    const calculatedCanvasHeight = Math.max(550, totalSourceRows * 35);
+
     const margin = { top: 40, right: 50, bottom: 40, left: 50 };
     const width = 1100 - margin.left - margin.right;
-    const height = 550 - margin.top - margin.bottom;
+    const height = calculatedCanvasHeight - margin.top - margin.bottom;
 
     const svg = container.append("svg")
         .attr("width", width + margin.left + margin.right)
@@ -50,65 +152,11 @@ export function updateAggregatedGraphLayout() {
         .append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // 1. Core Source Data Records Definitions Schema
-    const sourceData = {
-        Training_actions: [
-            { id: "a1", txt: "a1: CRM (8h)" },
-            { id: "a2", txt: "a2: Advanced Excel (12h)" },
-            { id: "a3", txt: "a3: Digital Marketing (6h)" }
-        ],
-        Employees_training_actions: [
-            { id: "t1", txt: "t1: Carla Gomez [ACT-03]", linksTo: "a3" },
-            { id: "t2", txt: "t2: Carla Gomez [ACT-01]", linksTo: "a1" },
-            { id: "t3", txt: "t3: David Miller [ACT-03]", linksTo: "a3" },
-            { id: "t4", txt: "t4: David Miller [ACT-01]", linksTo: "a1" },
-            { id: "t5", txt: "t5: David Miller [ACT-02]", linksTo: "a2" }
-        ],
-        Employees_training: [
-            { id: "p1", txt: "p1: Alice Smith - Safety (16h)" }
-        ]
-    };
-
-    // 2. Aggregated Result Nodes Mapping multi-tuple source relationships
-    const resultNodes = [
-        { 
-            id: "R1", 
-            name: "Carla Gomez", 
-            h: 14, 
-            prov: "(t1 · a3 ⊗ 6 + t2 · a1 ⊗ 8)",
-            lineage: [
-                { midId: "t1", leftId: "a3", midTable: "Employees_training_actions" },
-                { midId: "t2", leftId: "a1", midTable: "Employees_training_actions" }
-            ]
-        },
-        { 
-            id: "R2", 
-            name: "David Miller", 
-            h: 20, 
-            prov: "(t3 · a3 ⊗ 6 + t4 · a1 ⊗ 8 + t5 · a2 ⊗ 6)",
-            lineage: [
-                { midId: "t3", leftId: "a3", midTable: "Employees_training_actions" },
-                { midId: "t4", leftId: "a1", midTable: "Employees_training_actions" },
-                { midId: "t5", leftId: "a2", midTable: "Employees_training_actions" }
-            ]
-        },
-        { 
-            id: "R3", 
-            name: "Alice Smith", 
-            h: 16, 
-            prov: "p1",
-            lineage: [
-                { midId: "p1", leftId: null, midTable: "Employees_training" }
-            ]
-        }
-    ];
-
-    // 3. Grid Axis Positioning Specifications (Layout Separation Requirement)
     const cardWidth = 240;
     const positions = {
-        "Training_actions": { x: 0, y: 150 },
-        "Employees_training_actions": { x: 360, y: 30 },
-        "Employees_training": { x: 360, y: 280 },
+        "Training_actions": { x: 0, y: 80 },
+        "Employees_training_actions": { x: 360, y: 10 },
+        "Employees_training": { x: 360, y: Math.max(260, (sourceData.Employees_training_actions.length * 20) + 70) },
         "ResultsColumn": { x: 740 }
     };
 
@@ -126,7 +174,7 @@ export function updateAggregatedGraphLayout() {
     // 4. Paint Left Column & Stacked Center Column Schemas
     const tablesKeys = ["Training_actions", "Employees_training_actions", "Employees_training"];
     tablesKeys.forEach(key => {
-        const rows = sourceData[key];
+        const rows = sourceData[key] || [];
         const pos = positions[key];
         const isExpanded = expansionState[key];
         const h = getCardHeight(key, rows);
@@ -154,7 +202,7 @@ export function updateAggregatedGraphLayout() {
             .attr("font-size", "12px")
             .attr("font-weight", "bold")
             .attr("fill", "#ffffff")
-            .text(`${isExpanded ? "⊟" : "⊞"} ${key.replace(/_/g, " ")}`);
+            .text(`${isExpanded ? "⊟" : "⊞"} ${key.replace(/_/g, " ")} (${rows.length})`);
 
         if (isExpanded) {
             rows.forEach((row, i) => {
@@ -243,16 +291,15 @@ export function updateAggregatedGraphLayout() {
 
         activePathsRegistry.set(res.id, connectedWires);
     });
+
     // 7. Interactive Context Hover & Tooltip Events Binding
     resultElements
         .on("mouseover", function(event, d) {
-            // High-intensity highlight for lines mapped to active card focus limits
             const pathsToHighlight = activePathsRegistry.get(d.id) || [];
             pathsToHighlight.forEach(p => p.attr("stroke-width", 4.5).attr("stroke-opacity", 1));
 
             d3.select(this).select("rect").attr("stroke", "#38bdf8").attr("stroke-width", 2);
 
-            // Pop and fill the custom provenance metadata tooltip string content
             tooltip.style("visibility", "visible")
                 .html(`<strong>Provenance Semiring Annotation:</strong><br><span style='color:#ec4899;'>${d.prov}</span>`);
         })
@@ -271,8 +318,16 @@ export function updateAggregatedGraphLayout() {
     console.log("=== [AGGREGATED LINEAGE] Graph Drawing Phase Complete ===");
 }
 
-// Global browser window listener integration hook to support Vite modular tab switches
-window.addEventListener('knn-tab-visible', () => {
-    console.log("K-nn module intercepted unique visibility signal! Running layout arithmetic...");
-    updateAggregatedGraphLayout();
+// 8. FIXED: Sequential async loader unblocks data fetching before plotting the graphics canvas
+// Garante que este bloco está no final absoluto do teu k-nn.js
+window.addEventListener('knn-tab-visible', async () => {
+    console.log("[EVENT CAPTURED] K-nn panel visible trigger caught! Syncing database metadata...");
+    
+    if (window.duckDbConnection) {
+        await loadLineageFromParquetFiles(window.duckDbConnection);
+    } else {
+        console.warn(" window.duckDbConnection cannot be reached from window scope framework context.");
+    }
+    
+    await updateAggregatedGraphLayout();
 });

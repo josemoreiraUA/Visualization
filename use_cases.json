@@ -1,12 +1,11 @@
 {
     "Data loader": [],
-    "Lineage": [  "Data/Promotions_model2/Employees.parquet", 
+    "Lineage": [  
                         "Data/Promotions_model1/Employees_training.parquet",
                         "Data/Promotions_model1/Employees_training_actions.parquet",
                         "Data/Promotions_model1/Training_actions.parquet"
                     ],
-    "K-nn":     [  "Data/Promotions_model2/Employees.parquet", 
-                        "Data/Promotions_model1/Employees_training.parquet",
+    "K-nn":     [       "Data/Promotions_model1/Employees_training.parquet",
                         "Data/Promotions_model1/Employees_training_actions.parquet",
                         "Data/Promotions_model1/Training_actions.parquet"
                     ],   
@@ -16,7 +15,7 @@
                     "Data/Promotions_model1/manager_reviews.parquet",
                     "Data/Promotions_model1/promotions.parquet"
                 ],
-    "Decision tree": [  "Data/Promotions_model2/Employees.parquet", 
+    "Decision tree": [  
                         "Data/Promotions_model1/Employees_training.parquet",
                         "Data/Promotions_model1/Employees_training_actions.parquet",
                         "Data/Promotions_model1/Training_actions.parquet"
