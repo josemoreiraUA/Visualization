@@ -34,14 +34,19 @@ function initTabNavigation() {
             const targetId = btn.getAttribute('data-target');
             document.getElementById(targetId).classList.add('active-view');
 
-            // DETAILED STEP 2: Broadcast a decoupled global announcement window notification
+            // 🟢 FIXED: Split into clean, separate, isolated event triggers
             if (targetId === 'lineage-view') {
-                const eventNotification = new CustomEvent('lineage-tab-visible');
-                window.dispatchEvent(eventNotification);
+                console.log("📢 Signaling visibility trace strictly to Lineage module...");
+                window.dispatchEvent(new CustomEvent('lineage-tab-visible'));
+            } 
+            else if (targetId === 'knn-view') {
+                console.log("📢 Signaling visibility trace strictly to K-nn module...");
+                window.dispatchEvent(new CustomEvent('knn-tab-visible')); // This matches k-nn.js
             }
         });
     });
 }
+
 
 
 // 2. Expandable Accordion Widget Handler

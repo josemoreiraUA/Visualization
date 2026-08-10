@@ -5,9 +5,11 @@
                         "Data/Promotions_model1/Employees_training_actions.parquet",
                         "Data/Promotions_model1/Training_actions.parquet"
                     ],
-    "K-nn":     [   "Data/employees.parquet", 
-                    "Data/orders.parquet"
-                ],   
+    "K-nn":     [  "Data/Promotions_model2/Employees.parquet", 
+                        "Data/Promotions_model1/Employees_training.parquet",
+                        "Data/Promotions_model1/Employees_training_actions.parquet",
+                        "Data/Promotions_model1/Training_actions.parquet"
+                    ],   
     "Fairness": [   "Data/Promotions_model1/annual_reviews.parquet", 
                     "Data/Promotions_model1/employees.parquet",
                     "Data/Promotions_model1/business_reviews.parquet", 

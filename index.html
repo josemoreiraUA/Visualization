@@ -81,7 +81,11 @@
             <div id="chart-container"></div>
         </div>
 
-        <div id="knn-view" class="view-panel"><h3>K-nn Processing View</h3></div>
+        <div id="knn-view" class="view-panel">
+            <p>Hover over any aggregated employee card to view its complete semiring provenance annotation matrix.</p>
+            
+            <div id="chart-container-knn" class="d3-canvas-panel" style="width: 1050px; margin: 0 auto; background: #2b3341; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); min-height: 480px;"></div>
+        </div>
         <div id="fairness-view" class="view-panel"><h3>Fairness Analysis Metrics</h3></div>
         <div id="decision-tree-view" class="view-panel"><h3>Decision Tree Structure</h3></div>
         
@@ -94,5 +98,6 @@
         <script type="module" src="Javascript/data_loader.js"></script>
         <!-- Explicitly register lineage.js so Vite parses its window listeners at boot time! -->
         <script type="module" src="Javascript/lineage.js"></script>
+        <script type="module" src="Javascript/k-nn.js"></script>
     </body>
 </html>

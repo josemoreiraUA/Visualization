@@ -206,7 +206,9 @@ p {
 /* ==========================================================================
    D3.js Lineage Chart Canvas Structure
    ========================================================================== */
-#chart-container {
+/* Locate the D3 layout alignment rules inside your styles.css */
+#chart-container,
+#chart-container-knn {
     width: 1050px;
     margin: 0 auto;
     background: #2b3341;
@@ -215,6 +217,7 @@ p {
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
     min-height: 480px;
 }
+
 .node rect.main-box {
     cursor: pointer;
     rx: 6px;
