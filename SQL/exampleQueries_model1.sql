@@ -1,4 +1,22 @@
 
+-- Query example lineage for every training.
+SELECT EA.name as Employee, T.name as Action, T.hours, EA.prov || '.' || T.prov as prov
+FROM   Training_actions.parquet T, Employees_training_actions.parquet EA
+WHERE  T.actionId = EA.actionId
+    UNION ALL
+SELECT ET.name, ET.training_program, ET.hours, prov
+FROM   Employees_training.parquet ET
+
+
+-- Query example lineage with aggregation by employee.
+SELECT EA.name as Employee, SUM(T.hours) as hours, '(' || STRING_AGG(EA.prov || ' · ' || T.prov || ' ⊗ ' || hours, '  +  '  ORDER BY EA.prov, T.prov) || ')' as prov
+FROM   Training_actions.parquet T, Employees_training_actions.parquet EA
+WHERE  T.actionId = EA.actionId
+GROUP BY EA.name
+    UNION ALL
+SELECT ET.name, ET.hours, prov
+FROM   Employees_training.parquet ET
+
 -- Query 1 with provenance - promotions by employee
 SELECT  E.empId, 
         E.name, 

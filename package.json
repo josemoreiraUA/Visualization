@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -21,6 +23,8 @@
     "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
     "d3": "^7.9.0",
     "d3-sankey": "^0.12.3"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
   }
 }
-

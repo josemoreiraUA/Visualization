@@ -1,4 +1,5 @@
-I think this is a much stronger example than loan approval because it demonstrates **provenance, explainability, fairness, data integration, and trust** in a single scenario. It also aligns naturally with the strengths of a provenance-semiring framework.
+I think this is a much stronger example than loan approval because it demonstrates **provenance, explainability, fairness, data integration, and trust** 
+in a single scenario. It also aligns naturally with the strengths of a provenance-semiring framework.
 
 ## Overall scenario
 

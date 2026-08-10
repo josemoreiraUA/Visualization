@@ -1,21 +1,23 @@
 {
     "Data loader": [],
-    "Lineage": ["Data/employees.parquet"],
+    "Lineage": [  "Data/Promotions_model2/Employees.parquet", 
+                        "Data/Promotions_model1/Employees_training.parquet",
+                        "Data/Promotions_model1/Employees_training_actions.parquet",
+                        "Data/Promotions_model1/Training_actions.parquet"
+                    ],
     "K-nn":     [   "Data/employees.parquet", 
                     "Data/orders.parquet"
                 ],   
     "Fairness": [   "Data/Promotions_model1/annual_reviews.parquet", 
                     "Data/Promotions_model1/employees.parquet",
-                    "Data/Promotions_model1/official_reviews.parquet", 
+                    "Data/Promotions_model1/business_reviews.parquet", 
                     "Data/Promotions_model1/manager_reviews.parquet",
                     "Data/Promotions_model1/promotions.parquet"
                 ],
-    "Decision tree": [  "Data/Promotions_model2/employees.parquet", 
-                        "Data/Promotions_model2/manager_reviews_grades.parquet",
-                        "Data/Promotions_model2/manager_reviews_scores.parquet",
-                        "Data/Promotions_model2/promotions.parquet",
-                        "Data/Promotions_model2/managers.parquet",
-                        "Data/Promotions_model2/official_reviews.parquet"
+    "Decision tree": [  "Data/Promotions_model2/Employees.parquet", 
+                        "Data/Promotions_model1/Employees_training.parquet",
+                        "Data/Promotions_model1/Employees_training_actions.parquet",
+                        "Data/Promotions_model1/Training_actions.parquet"
                     ],
     "About": []
 }

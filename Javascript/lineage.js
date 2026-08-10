@@ -1,242 +1,230 @@
 import * as d3 from 'd3';
-import { sankey as d3Sankey } from 'd3-sankey';
 
-//  FIX 1: Move the Expansion Tracking Registry OUTSIDE the function to preserve states globally
+// Estado de expansão persistente para os nós de origem
 const expansionState = {
-    "UsersTable": false,
-    "OrdersTable": false
+    "Training_actions": false,
+    "Employees_training_actions": false,
+    "Employees_training": false
 };
 
-//  FIX 2: Move Table Colors Map outside as well for clean, persistent reference scoping
-const tableColors = {
-    "UsersTable": { default: "#3b82f6", active: "#60a5fa" },
-    "OrdersTable": { default: "#10b981", active: "#34d399" }
+const themeColors = {
+    actions: { default: "#38bdf8", active: "#0ea5e9" },
+    empActions: { default: "#10b981", active: "#059669" },
+    empTraining: { default: "#a855f7", active: "#8b5cf6" },
+    result: { bg: "#1e1b4b", stroke: "#818cf8" }
 };
 
-export function updateGraphLayout() {
-    console.log("=== [LINEAGE] updateGraphLayout() triggered ===");
+export function updateTrainingGraphLayout() {
+    console.log("=== [TRAINING LINEAGE] Rendering Graph Layout ===");
 
-    // Clear layout container layer
     const container = d3.select("#chart-container");
     container.selectAll("*").remove();
 
-    const margin = {top: 40, right: 220, bottom: 40, left: 220};
+    // Dimensões do Canvas (Três colunas horizontais bem distribuídas)
+    const margin = { top: 40, right: 50, bottom: 40, left: 50 };
     const width = 1100 - margin.left - margin.right;
-    const height = 500 - margin.top - margin.bottom;
+    const height = 550 - margin.top - margin.bottom;
 
-    const svg = d3.select("#chart-container")
-        .append("svg")
+    const svg = container.append("svg")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
         .append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // ❌ REMOVED/DELETED: expansionState and tableColors from here!
+    // 1. Definição estática dos dados das tabelas fonte
+    const sourceData = {
+        Training_actions: [
+            { id: "a1", txt: "a1: CRM (8h)" },
+            { id: "a2", txt: "a2: Advanced Excel (12h)" },
+            { id: "a3", txt: "a3: Digital Marketing (6h)" }
+        ],
+        Employees_training_actions: [
+            { id: "t1", txt: "t1: Carla Gomez [ACT-03]", linksTo: "a3" },
+            { id: "t2", txt: "t2: Carla Gomez [ACT-01]", linksTo: "a1" },
+            { id: "t3", txt: "t3: David Miller [ACT-03]", linksTo: "a3" },
+            { id: "t4", txt: "t4: David Miller [ACT-01]", linksTo: "a1" },
+            { id: "t5", txt: "t5: David Miller [ACT-02]", linksTo: "a2" }
+        ],
+        Employees_training: [
+            { id: "p1", txt: "p1: Alice Smith - Safety (16h)" }
+        ]
+    };
 
-    const sourceTables = [
-        {
-            id: "UsersTable",
-            name: "Users Table",
-            tuples: [
-                { id: "S1", name: "Tuple #101 (Alice)", targetId: "R1", value: 8 },
-                { id: "S2", name: "Tuple #102 (Bob)", targetId: "R2", value: 6 }
-            ]
-        },
-        {
-            id: "OrdersTable",
-            name: "Orders Table",
-            tuples: [
-                { id: "S3", name: "Tuple #901 ($50)", targetId: "R1", value: 4 },
-                { id: "S4", name: "Tuple #902 ($120)", targetId: "R1", value: 4 },
-                { id: "S5", name: "Tuple #903 (Audit)", targetId: "R3", value: 12 }
-            ]
-        }
-    ];
-
+    // 2. Resultados Finais anotados com Proveniência Composta
     const resultNodes = [
-        { id: "R1", title: "User Revenue View", tuples: ["Alice - Total: $170", "Status: Active Verified", "Partition: Node-0A"], type: "result" },
-        { id: "R2", title: "Zero Balance View", tuples: ["Bob - Total: $0", "Status: Idle Hibernated"], type: "result" },
-        { id: "R3", title: "System Audit Logs", tuples: ["Global Aggregation Sum", "Validation Checksum: OK"], type: "result" }
+        { id: "R1", name: "Carla Gomez", act: "Digital Marketing", h: 6, prov: "t1.a3", sourceTable: "Employees_training_actions", sourceId: "t1", refId: "a3" },
+        { id: "R2", name: "Carla Gomez", act: "CRM", h: 8, prov: "t2.a1", sourceTable: "Employees_training_actions", sourceId: "t2", refId: "a1" },
+        { id: "R3", name: "David Miller", act: "Digital Marketing", h: 6, prov: "t3.a3", sourceTable: "Employees_training_actions", sourceId: "t3", refId: "a3" },
+        { id: "R4", name: "David Miller", act: "CRM", h: 8, prov: "t4.a1", sourceTable: "Employees_training_actions", sourceId: "t4", refId: "a1" },
+        { id: "R5", name: "David Miller", act: "Advanced Excel", h: 12, prov: "t5.a2", sourceTable: "Employees_training_actions", sourceId: "t5", refId: "a2" },
+        { id: "R6", name: "Alice Smith", act: "Industrial Safety", h: 16, prov: "p1", sourceTable: "Employees_training", sourceId: "p1", refId: null }
     ];
 
-    let linkElement, nodeElement;
-    let selectedNode = null;
+    // 3. Mapeamento de Coordenadas Fixas por Colunas (Resolução do Requisito de Espaço)
+    const cardWidth = 240;
+    
+    const positions = {
+        "Training_actions": { x: 0, y: 150 },                         // Coluna Esquerda
+        "Employees_training_actions": { x: 360, y: 30 },             // Coluna Central Superior
+        "Employees_training": { x: 360, y: 280 },                    // Coluna Central Inferior (Debaixo)
+        "ResultsColumn": { x: 740 }                                   // Coluna Direita (Resultados)
+    };
 
-    const nodes = [
-        { id: "UsersTable", name: "Users Table", type: "source" },
-        { id: "OrdersTable", name: "Orders Table", type: "source" }
-    ];
-    resultNodes.forEach(r => {
-        nodes.push({ id: r.id, title: r.title, tuples: r.tuples, type: r.type });
-    });
+    // Calcular alturas dinâmicas das tabelas com base na expansão
+    function getCardHeight(key, baseRows) {
+        return expansionState[key] ? 45 + (baseRows.length * 20) : 45;
+    }
 
-    const links = [];
-    sourceTables.forEach(table => {
-        table.tuples.forEach(tuple => {
-            links.push({
-                source: table.id,
-                target: tuple.targetId,
-                value: tuple.value,
-                tupleId: tuple.id,
-                tableId: table.id 
+    // Gerar coordenadas exatas para cada tuplo interno para ancorar os caminhos (Wires)
+    function getTupleY(tableKey, tupleId, baseRows) {
+        const tableY = positions[tableKey].y;
+        if (!expansionState[tableKey]) return tableY + 22; // Centro do cabeçalho se colapsado
+        const idx = baseRows.findIndex(r => r.id === tupleId);
+        return tableY + 52 + (idx * 20);
+    }
+
+    // 4. Desenhar as Tabelas Fonte (Módulos da Esquerda e Centro)
+    const tablesKeys = ["Training_actions", "Employees_training_actions", "Employees_training"];
+    
+    tablesKeys.forEach(key => {
+        const rows = sourceData[key];
+        const pos = positions[key];
+        const isExpanded = expansionState[key];
+        const h = getCardHeight(key, rows);
+
+        const tableG = svg.append("g")
+            .attr("class", "node-table")
+            .attr("transform", `translate(${pos.x}, ${pos.y})`)
+            .style("cursor", "pointer")
+            .on("click", () => {
+                expansionState[key] = !expansionState[key];
+                updateTrainingGraphLayout(); // Re-renderização fluida
             });
-        });
-    });
 
-    const sankey = d3Sankey()
-        .nodeId(d => d.id)
-        .nodeWidth(220)
-        .nodePadding(90) 
-        .extent([[0, 0], [width, height]]);
+        // Fundo do Card
+        tableG.append("rect")
+            .attr("width", cardWidth)
+            .attr("height", h)
+            .attr("fill", "#1e293b")
+            .attr("stroke", key === "Training_actions" ? themeColors.actions.default : (key === "Employees_training_actions" ? themeColors.empActions.default : themeColors.empTraining.default))
+            .attr("stroke-width", 1.5)
+            .attr("rx", 6);
 
-    const computedGraph = sankey({ nodes: nodes, links: links });
+        // Título do Cabeçalho
+        tableG.append("text")
+            .attr("x", 12)
+            .attr("y", 26)
+            .attr("font-size", "12px")
+            .attr("font-weight", "bold")
+            .attr("fill", "#ffffff")
+            .text(`${isExpanded ? "⊟" : "⊞"} ${key.replace(/_/g, " ")}`);
 
-    function drawWireBundle(d) {
-        const isExpanded = expansionState[d.source.id];
-        let startX = d.source.x1;
-        let startY = d.source.y0 + 20; 
-
+        // Adicionar linhas de tuplos se expandido
         if (isExpanded) {
-            const table = sourceTables.find(t => t.id === d.source.id);
-            const tupleIndex = table.tuples.findIndex(t => t.id === d.tupleId);
-            if (tupleIndex !== -1) {
-                startY = d.source.y0 + 46 + (tupleIndex * 18); 
-            }
-        } else {
-            const offsetMultiplier = Math.min(1.5, 12 / d.value); 
-            startY = d.source.y0 + 20 + (d.value * offsetMultiplier * (d.tupleId === "S1" || d.tupleId === "S3" ? -1 : 1));
-        }
-
-        let endX = d.target.x0;
-        let endY = d.target.y0 + 42; 
-
-        if (d.target.id === "R1") {
-            const streamOffset = d.tableId === "UsersTable" ? -5 : 5;
-            endY = d.target.y0 + 42 + streamOffset;
-        }
-
-        const controlX = (startX + endX) / 2;
-        return `M ${startX} ${startY} C ${controlX} ${startY}, ${controlX} ${endY}, ${endX} ${endY}`;
-    }
-
-    linkElement = svg.append("g")
-        .selectAll(".link")
-        .data(computedGraph.links)
-        .join("path")
-        .attr("class", "link")
-        .attr("d", drawWireBundle)
-        .attr("stroke", d => tableColors[d.tableId].default)
-        .attr("stroke-width", d => expansionState[d.source.id] ? 2 : Math.min(Math.max(3, d.value * 0.8), 10))
-        .attr("fill", "none");
-
-    nodeElement = svg.append("g")
-        .selectAll(".node")
-        .data(computedGraph.nodes)
-        .join("g")
-        .attr("class", "node")
-        .attr("transform", d => `translate(${d.x0},${d.y0})`)
-        .on("click", handleNodeClick);
-
-    nodeElement.append("rect")
-        .attr("class", "main-box")
-        .attr("height", d => {
-            if (d.type === "result") return 75;
-            if (expansionState[d.id]) {
-                const table = sourceTables.find(t => t.id === d.id);
-                return 40 + (table.tuples.length * 18) + 10;
-            }
-            return 40; 
-        })
-        .attr("width", sankey.nodeWidth())
-        .attr("fill", d => {
-            if (d.type === "result") return "#1e1b4b";
-            return d.id === "UsersTable" ? "#1e3a8a" : d.id === "OrdersTable" ? "#064e3b" : "#1e3a8a";
-        })
-        .attr("stroke", d => {
-            if (d.type === "result") return "#818cf8";
-            return tableColors[d.id] ? tableColors[d.id].default : "#3b82f6";
-        })
-        .attr("stroke-width", 1.5);
-
-    nodeElement.append("text")
-        .attr("x", 12)
-        .attr("y", 22)
-        .attr("font-size", "11px")
-        .attr("font-weight", "bold")
-        .attr("fill", d => d.type === "source" ? "#38bdf8" : "#c7d2fe")
-        .text(d => {
-            if (d.type === "result") return d.title;
-            const icon = expansionState[d.id] ? "⊟" : "⊞";
-            return `${icon} ${d.name}`;
-        });
-
-    nodeElement.each(function(d) {
-        const currentBox = d3.select(this);
-
-        if (d.type === "result" && d.tuples) {
-            d.tuples.forEach((tupleText, index) => {
-                currentBox.append("text")
-                    .attr("class", "tuple-row")
-                    .attr("x", 16)
-                    .attr("y", 42 + (index * 15))
-                    .text(`• ${tupleText}`);
-            });
-        } 
-        else if (d.type === "source" && expansionState[d.id]) {
-            const table = sourceTables.find(t => t.id === d.id);
-            table.tuples.forEach((tuple, index) => {
-                currentBox.append("text")
-                    .attr("class", "tuple-row")
-                    .attr("x", 16)
-                    .attr("y", 46 + (index * 18))
-                    .text(`• ${tuple.name}`);
+            rows.forEach((row, i) => {
+                tableG.append("text")
+                    .attr("x", 20)
+                    .attr("y", 54 + (i * 20))
+                    .attr("font-size", "11px")
+                    .attr("fill", "#cbd5e1")
+                    .text(`• ${row.txt}`);
             });
         }
     });
 
-    function handleNodeClick(event, d) {
-        if (d.type === "source") {
-            expansionState[d.id] = !expansionState[d.id];
-            selectedNode = null;
-            updateGraphLayout();
-            return;
-        }
+    // 5. Desenhar os Cards de Resultado (Coluna Direita)
+    const resultCardHeight = 65;
+    
+    const resultElements = svg.append("g")
+        .selectAll(".result-card")
+        .data(resultNodes)
+        .join("g")
+        .attr("class", "result-card")
+        .attr("transform", (d, i) => `translate(${positions.ResultsColumn.x}, ${i * (resultCardHeight + 12)})`);
 
-        if (selectedNode === d.id) {
-            resetHighlighting();
-            return;
+    resultElements.append("rect")
+        .attr("width", cardWidth + 20)
+        .attr("height", resultCardHeight)
+        .attr("fill", themeColors.result.bg)
+        .attr("stroke", themeColors.result.stroke)
+        .attr("stroke-width", 1.5)
+        .attr("rx", 6);
+
+    resultElements.append("text")
+        .attr("x", 12)
+        .attr("y", 20)
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#38bdf8")
+        .text(d => d.name);
+
+    resultElements.append("text")
+        .attr("x", 12)
+        .attr("y", 38)
+        .attr("font-size", "11px")
+        .attr("fill", "#e2e8f0")
+        .text(d => `${d.act} (${d.h}h)`);
+
+    resultElements.append("text")
+        .attr("x", 12)
+        .attr("y", 54)
+        .attr("font-size", "10px")
+        .attr("font-family", "monospace")
+        .attr("fill", "#a855f7")
+        .text(d => `prov: ${d.prov}`);
+
+    // 6. Construção e Renderização dos Caminhos de Linhagem (Wires)
+    resultNodes.forEach((res, resIdx) => {
+        const resY = (resIdx * (resultCardHeight + 12)) + (resultCardHeight / 2);
+        const resX = positions.ResultsColumn.x;
+
+        // Conexão do Resultado para a sua respetiva Tabela Intermédia (Centro)
+        const midTableKey = res.sourceTable;
+        const midTupleY = getTupleY(midTableKey, res.sourceId, sourceData[midTableKey]);
+        const midTableX = positions[midTableKey].x + cardWidth;
+
+        const pathCenter = svg.append("path")
+            .attr("d", d3.linkHorizontal()({ source: [midTableX, midTupleY], target: [resX, resY] }))
+            .attr("fill", "none")
+            .attr("stroke", midTableKey === "Employees_training_actions" ? themeColors.empActions.default : themeColors.empTraining.default)
+            .attr("stroke-width", 2)
+            .attr("stroke-opacity", 0.4);
+
+        // Conexão Adicional: Da Tabela Intermédia para as Ações de Treino (Se aplicável)
+        if (res.refId) {
+            const leftTableX = positions["Training_actions"].x + cardWidth;
+            const leftTupleY = getTupleY("Training_actions", res.refId, sourceData["Training_actions"]);
+            const midTableLeftX = positions[midTableKey].x;
+
+            const pathLeft = svg.append("path")
+                .attr("d", d3.linkHorizontal()({ source: [leftTableX, leftTupleY], target: [midTableLeftX, midTupleY] }))
+                .attr("fill", "none")
+                .attr("stroke", themeColors.actions.default)
+                .attr("stroke-width", 2)
+                .attr("stroke-opacity", 0.4);
+
+            // Efeito de Destaque Interativo Combinado (Hover)
+            setupHoverEffect([pathCenter, pathLeft], res.sourceId, res.refId);
+        } else {
+            setupHoverEffect([pathCenter], res.sourceId, null);
         }
+    });
+
+    // Função de Destaque Visual por Proximidade Rápida
+    function setupHoverEffect(paths, midId, leftId) {
+        const elementsToTrigger = resultElements.filter(d => d.sourceId === midId && d.refId === leftId);
         
-        selectedNode = d.id;
-        const activeLinks = new Set();
-        const activeNodes = new Set([d.id]);
-
-        d.targetLinks.forEach(l => {
-            activeLinks.add(l);
-            activeNodes.add(l.source.id);
+        elementsToTrigger.on("mouseenter", () => {
+            paths.forEach(p => p.attr("stroke-width", 4).attr("stroke-opacity", 1));
+        }).on("mouseleave", () => {
+            paths.forEach(p => p.attr("stroke-width", 2).attr("stroke-opacity", 0.4));
         });
-
-        linkElement
-            .classed("active", l => activeLinks.has(l))
-            .classed("dimmed", l => !activeLinks.has(l))
-            .style("stroke", l => activeLinks.has(l) ? tableColors[l.tableId].active : tableColors[l.tableId].default); 
-
-        nodeElement
-            .classed("active-node", n => n.id === d.id)
-            .classed("dimmed", n => !activeNodes.has(n.id));
     }
 
-    function resetHighlighting() {
-        selectedNode = null;
-        linkElement
-            .classed("active", false)
-            .classed("dimmed", false)
-            .style("stroke", d => tableColors[d.tableId].default); 
-        nodeElement.classed("active-node", false).classed("dimmed", false);
-    }
+    console.log("=== [TRAINING LINEAGE] Graph Render Complete ===");
 }
 
-// 3. Attach window listener to broadcast channel trigger
+// Escuta no canal global de mudanças de tab do sistema modular
 window.addEventListener('lineage-tab-visible', () => {
-    updateGraphLayout();
+    updateTrainingGraphLayout();
 });
