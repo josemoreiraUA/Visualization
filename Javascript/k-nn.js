@@ -1,10 +1,8 @@
 import * as d3 from 'd3';
 
-// 1. GLOBAL VARIABLES (Declared outside so they can be modified by the loader function)
 let sourceData = { Training_actions: [], Employees_training_actions: [], Employees_training: [] };
 let resultNodes = [];
 
-// Persistent tracking of expand/collapse card drawers
 const expansionState = {
     "Training_actions": false,
     "Employees_training_actions": false,
@@ -18,27 +16,21 @@ const themeColors = {
     result: { bg: "#1e1b4b", stroke: "#818cf8" }
 };
 
-// ==========================================================================
-// 2. DYNAMIC METADATA EXTRACTOR ENGINE FROM ALL THREE PARQUET FILES
-// ==========================================================================
 async function loadLineageFromParquetFiles(duckDb) {
     if (!duckDb) return;
     try {
-        console.log("📊 Pulling active runtime metadata from local Parquet storage blocks...");
+        console.log("Pulling active runtime metadata from local Parquet storage blocks...");
 
-        // Query all three raw structural source tables from browser memory sandbox
         const resActions = await duckDb.query("SELECT prov, name, hours, actionId FROM 'Training_actions.parquet'");
         const resEmpActions = await duckDb.query("SELECT prov, name, actionId FROM 'Employees_training_actions.parquet'");
         const resEmpTraining = await duckDb.query("SELECT prov, name, training_program, hours FROM 'Employees_training.parquet'");
 
-        // Populate Training_actions list dynamically
         sourceData.Training_actions = resActions.toArray().map(row => ({
             id: row.prov,
             txt: `${row.prov}: ${row.name} (${row.hours}h)`,
             actionId: row.actionId
         }));
 
-        // Populate Employees_training_actions list dynamically
         sourceData.Employees_training_actions = resEmpActions.toArray().map(row => {
             const cleanActionNum = row.actionId ? row.actionId.replace('ACT-0', '').replace('ACT-', '') : '';
             return {
@@ -48,13 +40,11 @@ async function loadLineageFromParquetFiles(duckDb) {
             };
         });
 
-        // Populate Employees_training list dynamically
         sourceData.Employees_training = resEmpTraining.toArray().map(row => ({
             id: row.prov,
             txt: `${row.prov}: ${row.name} - ${row.training_program} (${row.hours}h)`
         }));
 
-        // Execute your exact annotated aggregate query statement across the schemas
         const resultQuery = await duckDb.query(`
             SELECT EA.name as Employee, SUM(T.hours) as hours, 
                    '(' || STRING_AGG(EA.prov || ' · ' || T.prov || ' ⊗ ' || T.hours, '  +  ' ORDER BY EA.prov, T.prov) || ')' as prov
@@ -66,32 +56,24 @@ async function loadLineageFromParquetFiles(duckDb) {
             FROM   'Employees_training.parquet' ET
         `);
 
-        // Dynamically build the linkage line network paths based on the aggregated query output
         resultNodes = resultQuery.toArray().map((row, idx) => {
             const lineagePaths = [];
             
             if (row.prov && row.prov.startsWith('(')) {
-                // Strip the surrounding parentheses bounding wrappers
                 const cleanProv = row.prov.slice(1, -1);
-                // Split each algebraic term separated by the double-space '+' string operator
                 const tokens = cleanProv.split('  +  ');
                 
                 tokens.forEach(token => {
-                    // Example token format: "t1 · a3 ⊗ 6"
                     const parts = token.split(' · ');
                     if (parts.length >= 2) {
-                        // 🟢 FIXED: Extract strings using array brackets first before trimming!
-                        const midId = parts[0].trim(); // Pulls 't1' safely
-                        
-                        // Extract left column action ID token ('a3') by removing the trailing hours metric
+                        const midId = parts[0].trim();
                         const remainder = parts[1];
-                        const leftId = remainder.split(' ⊗ ')[0].trim(); // Pulls 'a3' safely
+                        const leftId = remainder.split(' ⊗ ')[0].trim();
                         
                         lineagePaths.push({ midId: midId, leftId: leftId, midTable: "Employees_training_actions" });
                     }
                 });
             } else if (row.prov) {
-                // Fallback route for standard linear industrial sector rows
                 lineagePaths.push({ midId: row.prov, leftId: null, midTable: "Employees_training" });
             }
 
@@ -104,22 +86,18 @@ async function loadLineageFromParquetFiles(duckDb) {
             };
         });
 
-
-        console.log("✅ Live database records successfully loaded into graph structures:", { sourceData, resultNodes });
+        console.log("Live database records successfully loaded into graph structures:", { sourceData, resultNodes });
     } catch (err) {
-        console.error("❌ Failed to query and populate data from active Parquet context layers:", err);
+        console.error("Failed to query and populate data from active Parquet context layers:", err);
     }
 }
 
-
-// 3. GRAPH PLOTTING CALCULATION ENGINE
 export async function updateAggregatedGraphLayout() {
     console.log("=== [AGGREGATED LINEAGE] Initiating Layout Generator Pipeline ===");
 
     const container = d3.select("#chart-container-knn");
     container.selectAll("*").remove();
 
-    // Setup visual tooltip layout anchor layer directly over the container scope
     let tooltip = d3.select("#provenance-tooltip");
     if (tooltip.empty()) {
         tooltip = d3.select("body").append("div")
@@ -138,7 +116,6 @@ export async function updateAggregatedGraphLayout() {
             .style("z-index", "1000");
     }
 
-    // Dynamic heights based on number of records loaded to prevent card clipping
     const totalSourceRows = Math.max(sourceData.Training_actions.length, sourceData.Employees_training_actions.length + 2);
     const calculatedCanvasHeight = Math.max(550, totalSourceRows * 35);
 
@@ -166,12 +143,11 @@ export async function updateAggregatedGraphLayout() {
 
     function getTupleY(tableKey, tupleId, baseRows) {
         const tableY = positions[tableKey].y;
-        if (!expansionState[tableKey]) return tableY + 22; // Midpoint cluster collapse pivot anchor
+        if (!expansionState[tableKey]) return tableY + 22;
         const idx = baseRows.findIndex(r => r.id === tupleId);
         return tableY + 52 + (idx * 20);
     }
 
-    // 4. Paint Left Column & Stacked Center Column Schemas
     const tablesKeys = ["Training_actions", "Employees_training_actions", "Employees_training"];
     tablesKeys.forEach(key => {
         const rows = sourceData[key] || [];
@@ -185,7 +161,7 @@ export async function updateAggregatedGraphLayout() {
             .style("cursor", "pointer")
             .on("click", () => {
                 expansionState[key] = !expansionState[key];
-                updateAggregatedGraphLayout(); // Safe redraw callback pass
+                updateAggregatedGraphLayout();
             });
 
         tableG.append("rect")
@@ -216,7 +192,6 @@ export async function updateAggregatedGraphLayout() {
         }
     });
 
-    // 5. Paint Right Column Aggregated Result Rows
     const resultCardHeight = 60;
     const resultElements = svg.append("g")
         .selectAll(".result-card")
@@ -249,7 +224,6 @@ export async function updateAggregatedGraphLayout() {
         .attr("fill", "#38bdf8")
         .text(d => `Total Training: ${d.h} hours`);
 
-    // 6. Trace Multi-Connection Link Line Paths (Wire Bundles)
     const activePathsRegistry = new Map();
 
     resultNodes.forEach((res, resIdx) => {
@@ -262,7 +236,6 @@ export async function updateAggregatedGraphLayout() {
             const midTupleY = getTupleY(midTableKey, link.midId, sourceData[midTableKey]);
             const midTableX = positions[midTableKey].x + cardWidth;
 
-            // Generate center trace pathway wire segment
             const pathCenter = svg.append("path")
                 .attr("d", d3.linkHorizontal()({ source: [midTableX, midTupleY], target: [resX, resY] }))
                 .attr("fill", "none")
@@ -272,7 +245,6 @@ export async function updateAggregatedGraphLayout() {
             
             connectedWires.push(pathCenter);
 
-            // Generate optional left trace pathway wire segment from center table back to left actions
             if (link.leftId) {
                 const leftTableX = positions["Training_actions"].x + cardWidth;
                 const leftTupleY = getTupleY("Training_actions", link.leftId, sourceData["Training_actions"]);
@@ -292,7 +264,6 @@ export async function updateAggregatedGraphLayout() {
         activePathsRegistry.set(res.id, connectedWires);
     });
 
-    // 7. Interactive Context Hover & Tooltip Events Binding
     resultElements
         .on("mouseover", function(event, d) {
             const pathsToHighlight = activePathsRegistry.get(d.id) || [];
@@ -318,15 +289,13 @@ export async function updateAggregatedGraphLayout() {
     console.log("=== [AGGREGATED LINEAGE] Graph Drawing Phase Complete ===");
 }
 
-// 8. FIXED: Sequential async loader unblocks data fetching before plotting the graphics canvas
-// Garante que este bloco está no final absoluto do teu k-nn.js
 window.addEventListener('knn-tab-visible', async () => {
-    console.log("[EVENT CAPTURED] K-nn panel visible trigger caught! Syncing database metadata...");
+    console.log("K-nn panel visible trigger caught! Syncing database metadata...");
     
     if (window.duckDbConnection) {
         await loadLineageFromParquetFiles(window.duckDbConnection);
     } else {
-        console.warn(" window.duckDbConnection cannot be reached from window scope framework context.");
+        console.warn("window.duckDbConnection cannot be reached from window scope context.");
     }
     
     await updateAggregatedGraphLayout();

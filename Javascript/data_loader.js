@@ -1,15 +1,11 @@
 import * as d3 from 'd3';
 import * as duckdb from '@duckdb/duckdb-wasm';
 
-// Import your custom graph engine setup script 
-// import { updateGraphLayout } from './lineage.js';
-// Application Central State Management Registry
 let useCaseConfig = {};
 const loadedFileNamesSet = new Set();
 let duckDbInstance = null;
 let duckDbConnection = null;
 
-// Initialize layout actions on loading completion
 document.addEventListener('DOMContentLoaded', () => {
     initTabNavigation();
     initHelpAccordion();
@@ -20,54 +16,42 @@ document.addEventListener('DOMContentLoaded', () => {
     initSqlQueryConsoleHandler();
 });
 
-// 1. Tab Views Swapping Mechanism
 function initTabNavigation() {
     const buttons = document.querySelectorAll('.nav-btn');
     
     buttons.forEach(btn => {
         btn.addEventListener('click', () => {
-            // Se o botão estiver desativado por falta de ficheiros, removemos o bloqueio para testes
             if (btn.hasAttribute('disabled')) {
-                console.warn("⚠️ Tab blocked by initialization constraints. Unlocking for lineage verification...");
+                console.log("Tab blocked by initialization constraints. Unlocking for lineage verification...");
                 btn.removeAttribute('disabled');
             }
             
-            // Alternar classes visuais das abas
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active-tab'));
             document.querySelectorAll('.view-panel').forEach(v => v.classList.remove('active-view'));
             
             btn.classList.add('active-tab');
             const targetId = btn.getAttribute('data-target');
-            
             const targetPanel = document.getElementById(targetId);
             if (targetPanel) {
                 targetPanel.classList.add('active-view');
             }
 
-            // 🟢 MOTOR DE ROTEAMENTO CORRIGIDO: Forçar emissão inequívoca dos sinais
             if (targetId === 'lineage-view') {
-                console.log("📢 Signaling visibility trace strictly to Lineage module...");
+                console.log("Signaling visibility trace strictly to Lineage module...");
                 window.dispatchEvent(new CustomEvent('lineage-tab-visible'));
             } 
             else if (targetId === 'knn-view') {
-                console.log("📢 Signaling visibility trace strictly to K-nn module...");
-                // Emitir o evento exato que o teu k-nn.js está à escuta no fundo do ficheiro
+                console.log("Signaling visibility trace strictly to K-nn module...");
                 window.dispatchEvent(new CustomEvent('knn-tab-visible'));
             }
         });
     });
 }
 
-
-
-
-// 2. Expandable Accordion Widget Handler
 function initHelpAccordion() {
     const accordion = document.getElementById('help-accordion');
     const previewSpan = document.getElementById('help-text-preview');
     const iconSpan = document.getElementById('help-toggle-icon');
-    
-    const fullTextStr = "Instructions: Load required datasets to unblock specific features. To activate specific analysis views, upload the matching parquet filenames specified in your environment configuration profile (use_cases.json). Once verified, buttons will instantly unlock.";
 
     accordion.addEventListener('click', () => {
         const isCollapsed = accordion.classList.toggle('collapsed');
@@ -81,7 +65,6 @@ function initHelpAccordion() {
     });
 }
 
-// 2.5 Manage Expandable Console Accordion Panel Transitions
 function initConsoleAccordion() {
     const consoleContainer = document.getElementById('query-console-section');
     const header = document.getElementById('console-accordion-header');
@@ -91,9 +74,7 @@ function initConsoleAccordion() {
     if (!header || !consoleContainer || !content || !iconSpan) return;
 
     header.addEventListener('click', () => {
-        // Toggle the collapsed flag state attribute dynamically
         const isCollapsed = consoleContainer.classList.toggle('collapsed');
-        
         if (isCollapsed) {
             content.style.display = "none";
             iconSpan.textContent = "▼";
@@ -104,8 +85,6 @@ function initConsoleAccordion() {
     });
 }
 
-
-// 3. Load Use Cases Matrix Configurations Profiles
 async function loadUseCaseConfigJSON() {
     try {
         const response = await fetch('/use_cases.json');
@@ -113,11 +92,10 @@ async function loadUseCaseConfigJSON() {
         evaluateButtonUnlockingStates();
         renderStorageStatusUI(); 
     } catch (err) {
-        console.error("Failed to parse use_cases.json profile configuration mapping matrix:", err);
+        console.error("Failed to parse use_cases.json configuration:", err);
     }
 }
 
-// 4. Evaluate and Adjust Button Disabling Rules
 function evaluateButtonUnlockingStates() {
     const mappings = [
         { btnId: "btn-lineage", key: "Lineage" },
@@ -130,7 +108,6 @@ function evaluateButtonUnlockingStates() {
         const targetBtn = document.getElementById(map.btnId);
         const requiredFilesList = useCaseConfig[map.key] || [];
         
-        // Fix: If a button needs "Data/employees.parquet", extract "employees.parquet" to match file.name
         const metRequirements = requiredFilesList.every(filePath => {
             const cleanFileName = filePath.split('/').pop(); 
             return loadedFileNamesSet.has(cleanFileName);
@@ -144,21 +121,13 @@ function evaluateButtonUnlockingStates() {
     });
 }
 
-
-// 5. Setup Bundler-Safe DuckDB Web Worker Environment
 async function initDuckDatabaseEngine() {
     try {
-        // FIX: Extract the core namespace dynamically to handle Vite CommonJS grouping wrappers safely
         const duckdbModule = duckdb.ConsoleLogger ? duckdb : (duckdb.default || duckdb);
-
-        // Fetch local module/worker paths from your dependencies installation
         const allBundles = duckdbModule.getJsDelivrBundles();
         const chosenBundle = await duckdbModule.selectBundle(allBundles);
-
-        // Instantiate the logger from the safe module wrapper reference
         const logger = new duckdbModule.ConsoleLogger();
         
-        // Wrap the bundle workers smoothly inside a dynamic safe runtime script blob
         const workerBlobUrl = URL.createObjectURL(
             new Blob([`importScripts("${chosenBundle.mainWorker}");`], { type: 'text/javascript' })
         );
@@ -172,13 +141,9 @@ async function initDuckDatabaseEngine() {
         console.log("DuckDB WASM Engine connected successfully!");
         
         URL.revokeObjectURL(workerBlobUrl);
-        
-        console.log("DuckDB WASM Engine connected successfully!");
-        
-        // Clear any previous error/unreachable markers from the presentation area
         document.getElementById('preview-table-container').innerHTML = '';
     } catch (err) {
-        console.error("Failed to connect to local DuckDB bundle instance:", err);
+        console.error("Failed to connect to local DuckDB instance:", err);
         document.getElementById('preview-table-container').innerHTML = `
             <div style="background-color: #451a03; border: 1px solid #f59e0b; padding: 15px; color: #fef3c7; border-radius: 6px; font-family: monospace;">
                 <strong>Database Engine Initialization Error:</strong><br>
@@ -187,16 +152,12 @@ async function initDuckDatabaseEngine() {
     }
 }
 
-
-
-// 6. Manage File Upload Input Parsing Buffers
 function initFileUploadHandler() {
     const input = document.getElementById('parquet-picker');
     input.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
 
-        // FIX: Safely resolve the dynamic namespace wrapper from Vite
         const duckdbModule = duckdb.ConsoleLogger ? duckdb : (duckdb.default || duckdb);
 
         for (const file of files) {
@@ -205,7 +166,7 @@ function initFileUploadHandler() {
                     await duckDbInstance.registerFileHandle(
                         file.name,
                         file,
-                        duckdbModule.DuckDBDataProtocol.BROWSER_FILEREADER, // Fix: use duckdbModule wrapper here
+                        duckdbModule.DuckDBDataProtocol.BROWSER_FILEREADER,
                         true
                     );
                 }
@@ -215,34 +176,27 @@ function initFileUploadHandler() {
         
         renderStorageStatusUI();
         evaluateButtonUnlockingStates();
-        input.value = ''; // Reset file input descriptor state
+        input.value = '';
     });
 }
 
-
-// 7. Render Use Cases Checklist Tracker with Dynamic Gray/Green Color Transitions
-// 7. Render Use Cases Checklist Tracker in a Single Line per Use Case
 function renderStorageStatusUI() {
     const container = document.getElementById('storage-status-container');
     if (!container || !useCaseConfig) return;
 
     container.innerHTML = '';
-
     const relevantUseCases = ["Lineage", "K-nn", "Fairness", "Decision tree"];
 
     relevantUseCases.forEach(useCaseKey => {
         const requiredFiles = useCaseConfig[useCaseKey] || [];
         if (requiredFiles.length === 0) return;
 
-        // Verify if all files in the requirement array are fully uploaded
         const isUseCaseFullyLoaded = requiredFiles.every(filePath => {
             const cleanFileName = filePath.split('/').pop();
             return loadedFileNamesSet.has(cleanFileName);
         });
 
-        // Dynamic use case row coloring configuration metrics rules
         const titleColor = isUseCaseFullyLoaded ? "#10b981" : "#94a3b8";
-
         const rowItem = document.createElement('div');
         rowItem.style.display = "flex";
         rowItem.style.alignItems = "center";
@@ -254,13 +208,10 @@ function renderStorageStatusUI() {
         rowItem.style.fontSize = "13px";
         rowItem.style.border = `1px solid ${isUseCaseFullyLoaded ? '#10b981' : '#334155'}`;
 
-        // Build out inline file names span grouping strings elements array
         const filesSpanHTML = requiredFiles.map(filePath => {
             const cleanFileName = filePath.split('/').pop();
             const isFileLoaded = loadedFileNamesSet.has(cleanFileName);
             const fileColor = isFileLoaded ? "#10b981" : "#94a3b8";
-            
-            // Render an inline preview shortcut link button directly next to loaded items
             const previewBtn = isFileLoaded ? `<button class="preview-icon-btn" data-file="${cleanFileName}" style="padding: 2px 6px; font-size: 10px; margin-left: 4px; background-color: #334155; color: #38bdf8; border: none; border-radius: 4px; cursor: pointer;">🔍</button>` : '';
 
             return `<span style="color: ${fileColor}; font-weight: 500;">${cleanFileName}${previewBtn}</span>`;
@@ -276,10 +227,9 @@ function renderStorageStatusUI() {
             </div>
         `;
 
-        // Bind interactive event loops handlers to inline preview lenses
         rowItem.querySelectorAll('.preview-icon-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Avoid triggering parent block bubbles clicks
+                e.stopPropagation();
                 const targetFile = btn.getAttribute('data-file');
                 executePreviewRowExtraction(targetFile);
             });
@@ -289,18 +239,14 @@ function renderStorageStatusUI() {
     });
 }
 
-
-
-// 8. Execute SQL  Query and Draw HTML Output Grid
 function renderDuckTable(queryResponse, container) {
     const structuralRows = queryResponse.toArray();
 
     if (structuralRows.length === 0) {
-        container.innerHTML = `<p style="color: #10b981;">✅ Execution successful. Empty output set returned.</p>`;
+        container.innerHTML = `<p style="color: #10b981;">Execution successful. Empty output set returned.</p>`;
         return;
     }
 
-    // Extract headers safely from Apache Arrow schema structure fields
     const keys = queryResponse.schema.fields.map(field => field.name);
     
     container.innerHTML = `
@@ -334,10 +280,6 @@ async function executePreviewRowExtraction(fileName) {
     }
 }
 
-// 9. Draw workspace headers from structuralRows[0] 
-// ==========================================================================
-// 9. Simplified Custom SQL Workspace Console Actions (With Unified Error Cards)
-// ==========================================================================
 function initSqlQueryConsoleHandler() {
     const runBtn = document.getElementById('execute-sql-btn');
     if (!runBtn) return;
@@ -351,7 +293,6 @@ function initSqlQueryConsoleHandler() {
 
         const sqlQueryRaw = queryInput.value.trim();
         
-        // CHANGED: Formatted the empty warning message to look exactly like the exception card
         if (!sqlQueryRaw) {
             container.innerHTML = `
                 <div style="background-color: #451a03; border: 1px solid #f59e0b; padding: 15px; color: #fef3c7; border-radius: 6px; font-family: monospace;">
@@ -375,4 +316,3 @@ function initSqlQueryConsoleHandler() {
         }
     });
 }
-
