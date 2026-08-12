@@ -31,8 +31,10 @@ async function loadLineageFromParquetFiles(duckDb) {
         console.log("Pulling active runtime metadata from local Parquet storage blocks...");
 
         const resActions = await duckDb.query("SELECT prov, name, hours, actionId FROM 'Training_actions.parquet'");
-        const resEmpActions = await duckDb.query("SELECT prov, name, actionId FROM 'Employees_training_actions.parquet'");
-        const resEmpTraining = await duckDb.query("SELECT prov, name, training_program, hours FROM 'Employees_training.parquet'");
+//        const resEmpActions = await duckDb.query("SELECT prov, name, actionId FROM 'Employees_training_actions.parquet'");
+//        const resEmpTraining = await duckDb.query("SELECT prov, name, training_program, hours FROM 'Employees_training.parquet'");
+        const resEmpActions = await duckDb.query("SELECT prov, name, actionId FROM 'Employees_training_actions.parquet' where name between 'C' and 'J'");
+        const resEmpTraining = await duckDb.query("SELECT prov, name, training_program, hours FROM 'Employees_training.parquet' where name between 'K' and 'R'");
 
         sourceData.Training_actions = resActions.toArray().map(row => ({
             id: row.prov,
@@ -319,7 +321,7 @@ export async function updateAggregatedGraphLayout() {
                 .attr("d", d3.linkHorizontal()({ source: [midTableX, midTupleY], target: [resX, resY] }))
                 .attr("fill", "none")
                 .attr("stroke", midTableKey === "Employees_training_actions" ? themeColors.empActions.default : themeColors.empTraining.default)
-                .attr("stroke-width", isWireActive && activeFilter.tableKey ? 3.5 : 2)
+                .attr("stroke-width", isWireActive && activeFilter.tableKey ? 1.5 : 0.3)
                 .attr("stroke-opacity", isWireActive ? (activeFilter.tableKey ? 1.0 : 0.3) : 0.05);
             
             connectedWires.push({ path: pathCenter, active: isWireActive });

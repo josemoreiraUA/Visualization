@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Interactive Database Provenance Graph</title>
+      <script type="module" crossorigin src="/Visualization/assets/index-BuiyLOE6.js"></script>
+      <link rel="stylesheet" crossorigin href="/Visualization/assets/index-CXwyTRa7.css">
+    </head>
+    <body>
+
+        <h2>Data Provenance & XAI</h2>
+
+        <!-- 1. Unified Navigation Button Panel Container -->
+        <div id="nav-panel">
+            <button id="btn-data-loader" class="nav-btn active-tab" data-target="data-loader-view">Data loader</button>
+            <button id="btn-lineage" class="nav-btn" data-target="lineage-view" disabled>Lineage</button>
+            <button id="btn-knn" class="nav-btn" data-target="knn-view" disabled>K-nn</button>
+            <button id="btn-fairness" class="nav-btn" data-target="fairness-view" disabled>Fairness</button>
+            <button id="btn-decision-tree" class="nav-btn" data-target="decision-tree-view" disabled>Decision tree</button>
+            <button id="btn-about" class="nav-btn" data-target="about-view">About</button>
+        </div>
+
+        <!-- 3. Target Views Containers -->
+        <div id="data-loader-view" class="view-panel active-view">
+            
+            <!-- FIXED: Moved the Interactive Help Accordion inside the active data loader view wrapper -->
+            <div id="help-accordion" class="collapsed" style="overflow: hidden; box-sizing: border-box; margin-bottom: 20px; width: 100%;">
+                
+                <div id="help-header" style="display: flex; justify-content: space-between; align-items: center; font-family: sans-serif; font-size: 1.17em; color: #ffffff; font-weight: bold; cursor: pointer; user-select: none;">
+                    <!-- FIX: Re-added the missing id="help-text-preview" attribute tag to unblock data_loader.js line 58 -->
+                    <span id="help-text-preview">Read me...</span>
+                    <span id="help-toggle-icon" style="color: #38bdf8;">▼</span>
+                </div>
+                
+                <div id="help-full-content" style="margin-top: 15px; font-family: sans-serif;">
+                    <div class="help-desc" style="text-align: left; color: #cbd5e1; line-height: 1.5; margin: 0;">
+                        <p style="text-align: left; margin-bottom: 12px; margin-top: 0;">
+                            Modern web browsers prevent web applications from accessing files stored on a user's computer without explicit permission. Therefore, the datasets required for the examples provided by this platform must be loaded into the application before they can be processed. All data remains on the user's machine and data processing is performed entirely within the browser using DuckDB-WASM, eliminating the need for a backend server or database installation.
+                        </p>
+                        <p style="text-align: left; margin: 0;">
+                            The modules in the top navigation bar depend on specific input datasets and each module remains disabled until all of its required files have been loaded. Once loaded, the datasets can be previewed and queried using the integrated DuckDB SQL workspace.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loader-box">
+                <label for="parquet-picker" class="file-drop-label">Choose Local Parquet Files</label>
+                <input type="file" id="parquet-picker" accept=".parquet" multiple style="display:none;" />
+            </div>
+            
+            <div id="loaded-files-section">
+                <h3>Uploaded Virtual Storage Status</h3>
+                <div id="storage-status-container"></div>
+            </div>
+
+            <!-- SQL Query Workspace Console -->
+            <div id="query-console-section" class="collapsed" style="overflow: hidden; box-sizing: border-box; margin-bottom: 20px; width: 100%;">
+                <div id="console-accordion-header" style="display: flex; justify-content: space-between; align-items: left; font-family: sans-serif; font-size: 1.17em; color: #ffffff; font-weight: bold; cursor: pointer; user-select: none;">
+                    <span>Interactive SQL Workspace Console</span>
+                    <span id="console-toggle-icon" style="color: #38bdf8;">▼</span>
+                </div>
+
+                <!-- Collapsible Wrapper for the Textarea and Execute Button -->
+                <div id="console-accordion-content" style="margin-top: 15px; font-family: sans-serif; display: none;">
+                    <p style="text-align: left; color: #94a3b8; font-size: 13px; margin-bottom: 12px; margin-top: 0;">
+                        Run advanced custom analytical queries against your loaded memory tables (e.g. <code>SELECT * FROM 'employees.parquet' WHERE salary > 50000</code>).
+                    </p>
+                    <textarea id="custom-sql-input" rows="7" style="width: 100%; background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 6px; padding: 12px; font-family: monospace; box-sizing: border-box; resize: vertical;" placeholder="SELECT * FROM 'employees.parquet' LIMIT 5"></textarea>
+                    <button id="execute-sql-btn" style="margin-top: 10px; padding: 8px 20px; font-weight: bold; background-color: #38bdf8; color: #0f172a; border: none; border-radius: 6px; cursor: pointer;">Execute Query Statement</button>
+                </div>
+            </div>
+
+            <div id="preview-section">
+                <h3>Structured Record Row Data Viewer</h3>
+                <div id="preview-table-container"></div>
+            </div>
+        </div>
+
+        <div id="lineage-view" class="view-panel">
+            <p>Click any node card to trace its input-to-output database query lineage.</p>
+            <div id="chart-container"></div>
+        </div>
+
+        <div id="knn-view" class="view-panel">
+            <p>Hover over any aggregated employee card to view its complete semiring provenance annotation matrix.</p>
+            
+            <div id="chart-container-knn" class="d3-canvas-panel" style="width: 1050px; margin: 0 auto; background: #2b3341; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); min-height: 480px;"></div>
+        </div>
+        <div id="fairness-view" class="view-panel"><h3>Fairness Analysis Metrics</h3></div>
+        <div id="decision-tree-view" class="view-panel"><h3>Decision Tree Structure</h3></div>
+        
+        <div id="about-view" class="view-panel">
+            <h3>About This Application</h3>
+            <p style="text-align:left; padding: 0 20px;">This environment traces database tuple operations natively inside your browser sandbox.</p>
+        </div>
+
+        <!-- Only boot data_loader.js as a native ES Module script -->
+        <!-- Explicitly register lineage.js so Vite parses its window listeners at boot time! -->
+    </body>
+</html>

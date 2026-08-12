@@ -87,7 +87,7 @@ function initConsoleAccordion() {
 
 async function loadUseCaseConfigJSON() {
     try {
-        const response = await fetch('/use_cases.json');
+        const response = await fetch('use_cases.json');
         useCaseConfig = await response.json();
         evaluateButtonUnlockingStates();
         renderStorageStatusUI(); 

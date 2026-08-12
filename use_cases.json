@@ -10,7 +10,7 @@
                         "Data/Promotions_model1/Training_actions.parquet"
                     ],   
     "Fairness": [   "Data/Promotions_model1/annual_reviews.parquet", 
-                    "Data/Promotions_model1/employees.parquet",
+                    "Data/Promotions_model1/employees_old.parquet",
                     "Data/Promotions_model1/business_reviews.parquet", 
                     "Data/Promotions_model1/manager_reviews.parquet",
                     "Data/Promotions_model1/promotions.parquet"
